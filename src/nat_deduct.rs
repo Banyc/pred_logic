@@ -223,6 +223,15 @@ pub fn simplification(prem: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Ar
     Some(Arc::clone(conclusion))
 }
 
+pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
+    let conclusion = Expr::BinOp(BinOpExpr {
+        op: BinOp::Or,
+        left: Arc::clone(prem),
+        right: q,
+    });
+    Some(Arc::new(conclusion))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::expr::Named;
@@ -477,6 +486,23 @@ mod tests {
         let conclusion = simplification(&prem, &unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion, p);
+    }
+
+    #[test]
+    fn test_add() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        println!("{p}");
+        let conclusion = addition(&p, q.clone()).unwrap();
+        println!("{conclusion}");
+        assert_eq!(
+            conclusion.as_ref(),
+            &Expr::BinOp(BinOpExpr {
+                op: BinOp::Or,
+                left: p,
+                right: q,
+            })
+        );
     }
 
     fn named_var_expr(name: &str) -> Arc<Expr> {
