@@ -5,6 +5,9 @@ use crate::expr::{BinOp, BinOpExpr, Expr, UnOp, UnOpExpr};
 pub mod r#impl;
 pub mod repl;
 
+/// ```math
+/// ∼p
+/// ```
 fn not(p: Arc<Expr>) -> Arc<Expr> {
     Arc::new(Expr::UnOp(UnOpExpr {
         op: UnOp::Not,
@@ -114,6 +117,9 @@ fn or(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
         right: q,
     }))
 }
+/// ```math
+/// q ∨ p
+/// ```
 fn comm_or(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
     or(q, p)
 }
@@ -127,6 +133,9 @@ fn and(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
         right: q,
     }))
 }
+/// ```math
+/// q ⋅ p
+/// ```
 fn comm_and(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
     and(q, p)
 }
