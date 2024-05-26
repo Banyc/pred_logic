@@ -81,6 +81,18 @@ replace! (
         comm_and;
     }
 );
+pub fn commutative(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        commutative_or(expr, unnamed_space),
+        commutative_and(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
 
 #[cfg(test)]
 mod tests {
