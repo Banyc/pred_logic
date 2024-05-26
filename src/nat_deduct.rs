@@ -191,6 +191,15 @@ impl Syllogism<'_> {
         Some(conclusion)
     }
 
+    pub fn conjunction(&self) -> Option<Arc<Expr>> {
+        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::clone(self.major_prem),
+            right: Arc::clone(self.minor_prem),
+        }));
+        Some(conclusion)
+    }
+
     fn extract(&self, major_pattern: &Expr, minor_patter: &Expr) -> Option<VarExprMap> {
         let captured_1 = extract(self.major_prem, major_pattern)?;
         let captured_2 = extract(self.minor_prem, minor_patter)?;
@@ -428,6 +437,28 @@ mod tests {
                     op: UnOp::Not,
                     expr: s,
                 })),
+            })
+        );
+    }
+
+    #[test]
+    fn test_conj() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        println!("{p}");
+        println!("{q}");
+        let syllogism = Syllogism {
+            major_prem: &p,
+            minor_prem: &q,
+        };
+        let conclusion = syllogism.conjunction().unwrap();
+        println!("{conclusion}");
+        assert_eq!(
+            conclusion.as_ref(),
+            &Expr::BinOp(BinOpExpr {
+                op: BinOp::And,
+                left: p,
+                right: q,
             })
         );
     }
