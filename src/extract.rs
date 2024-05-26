@@ -11,10 +11,8 @@ pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
             let map = VarExprMap::from_iter([(var.clone(), Arc::clone(src))]);
             Some(map)
         }
-        (Expr::Pred(s), Expr::Pred(p)) => {
-            let same_name = s.name == p.name;
-            let same_ind = s.ind == p.ind;
-            if same_name && same_ind {
+        (Expr::Pred(_), Expr::Pred(_)) | (Expr::EquivInd(_), Expr::EquivInd(_)) => {
+            if src.as_ref() == pattern {
                 Some(VarExprMap::new())
             } else {
                 None
@@ -35,14 +33,6 @@ pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
             match (same_op, expr) {
                 (true, Some(expr)) => Some(expr),
                 _ => None,
-            }
-        }
-        (Expr::EquivInd(s), Expr::EquivInd(p)) => {
-            let same_equiv = s == p;
-            if same_equiv {
-                Some(VarExprMap::new())
-            } else {
-                None
             }
         }
         (Expr::Var(_), _) => None,
