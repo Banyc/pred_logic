@@ -8,6 +8,22 @@ pub enum Expr {
     EquivInd(EquivInd),
     Var(Var),
 }
+impl Expr {
+    pub fn is_leaf(&self) -> bool {
+        match self {
+            Expr::Pred(_) | Expr::EquivInd(_) | Expr::Var(_) | Expr::UnOp(_) => true,
+            Expr::BinOp(_) => false,
+        }
+    }
+
+    pub fn add_necessary_paren(&self) -> String {
+        if self.is_leaf() {
+            self.to_string()
+        } else {
+            format!("({})", self)
+        }
+    }
+}
 impl core::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -113,7 +129,10 @@ pub struct BinOpExpr {
 }
 impl core::fmt::Display for BinOpExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) {} ({})", self.left, self.op, self.right)
+        let left = self.left.add_necessary_paren();
+        let right = self.right.add_necessary_paren();
+        let op = &self.op;
+        write!(f, "{left} {op} {right}")
     }
 }
 
@@ -140,7 +159,9 @@ pub struct UnOpExpr {
 }
 impl core::fmt::Display for UnOpExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}({})", self.op, self.expr)
+        let expr = self.expr.add_necessary_paren();
+        let op = &self.op;
+        write!(f, "{op}{expr}")
     }
 }
 
