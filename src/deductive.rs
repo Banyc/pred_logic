@@ -74,6 +74,24 @@ impl Syllogism {
         Some(conclusion)
     }
 
+    pub fn disjunctive_syllogism(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+        let mut unnamed_space = unnamed_space.clone();
+        let p = Var::Unnamed(unnamed_space.gen());
+        let q = Var::Unnamed(unnamed_space.gen());
+        let major_prem = Expr::BinOp(BinOpExpr {
+            op: BinOp::Or,
+            left: Arc::new(Expr::Var(p.clone())),
+            right: Arc::new(Expr::Var(q.clone())),
+        });
+        let minor_prem = Expr::UnOp(UnOpExpr {
+            op: UnOp::Not,
+            expr: Arc::new(Expr::Var(p.clone())),
+        });
+        let captured = self.extract(&major_prem, &minor_prem)?;
+        let conclusion = captured.get(&q).unwrap();
+        Some(Arc::clone(conclusion))
+    }
+
     fn extract(&self, major_pattern: &Expr, minor_patter: &Expr) -> Option<VarExprMap> {
         let captured_1 = extract(&self.major_prem, major_pattern)?;
         let captured_2 = extract(&self.minor_prem, minor_patter)?;
@@ -174,6 +192,31 @@ mod tests {
                 right: r.clone(),
             })
         );
+    }
+
+    #[test]
+    fn test_ds() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
+            op: BinOp::Or,
+            left: p.clone(),
+            right: q.clone(),
+        }));
+        println!("{major_prem}");
+        let minor_prem = Arc::new(Expr::UnOp(UnOpExpr {
+            op: UnOp::Not,
+            expr: p.clone(),
+        }));
+        println!("{minor_prem}");
+        let syllogism = Syllogism {
+            major_prem,
+            minor_prem,
+        };
+        let unnamed_space = UnnamedGen::new();
+        let conclusion = syllogism.disjunctive_syllogism(&unnamed_space).unwrap();
+        println!("{conclusion}");
+        assert_eq!(conclusion, q);
     }
 
     fn named_var_expr(name: &str) -> Arc<Expr> {
