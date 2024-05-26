@@ -8,7 +8,10 @@ use crate::{
 use super::{and, comm_and, comm_or, or, two_and_not, two_not_and, two_not_or, two_or_not};
 
 macro_rules! replace {
-    ( $f:ident, $( $var:ident )*, $pat:ident, $equiv:ident, ) => {
+    ( fn $f:ident ( $( $var:ident ),* ) {
+        $pat:ident;
+        $equiv:ident;
+    } ) => {
         pub fn $f(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
             let mut unnamed_space = unnamed_space.clone();
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
@@ -26,28 +29,28 @@ macro_rules! replace {
 }
 
 replace! (
-    de_morgen_not_and,
-    p q,
-    two_not_and,
-    two_or_not,
+    fn de_morgen_not_and(p, q) {
+        two_not_and;
+        two_or_not;
+    }
 );
 replace! (
-    de_morgen_or_not,
-    p q,
-    two_or_not,
-    two_not_and,
+    fn de_morgen_or_not(p, q) {
+        two_or_not;
+        two_not_and;
+    }
 );
 replace! (
-    de_morgen_not_or,
-    p q,
-    two_not_or,
-    two_and_not,
+    fn de_morgen_not_or(p, q) {
+        two_not_or;
+        two_and_not;
+    }
 );
 replace! (
-    de_morgen_and_not,
-    p q,
-    two_and_not,
-    two_not_or,
+    fn de_morgen_and_not(p, q) {
+        two_and_not;
+        two_not_or;
+    }
 );
 pub fn de_morgen(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
     match (
@@ -67,16 +70,16 @@ pub fn de_morgen(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Exp
 }
 
 replace! (
-    commutative_or,
-    p q,
-    or,
-    comm_or,
+    fn commutative_or(p, q) {
+        or;
+        comm_or;
+    }
 );
 replace! (
-    commutative_and,
-    p q,
-    and,
-    comm_and,
+    fn commutative_and(p, q) {
+        and;
+        comm_and;
+    }
 );
 
 #[cfg(test)]

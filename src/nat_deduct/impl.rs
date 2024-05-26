@@ -11,7 +11,11 @@ use super::{
 };
 
 macro_rules! syllogism_implement {
-    ( $f:ident, $( $var:ident )*, $major_pat:ident, $minor_pat:ident, $conclusion:ident, ) => {
+    ( fn $f:ident ( $( $var:ident ),* ) {
+        $major_pat:ident;
+        $minor_pat:ident;
+        $conclusion:ident;
+    } ) => {
         pub fn $f(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
             let mut unnamed_space = unnamed_space.clone();
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
@@ -38,46 +42,46 @@ pub struct Syllogism<'a> {
 }
 impl Syllogism<'_> {
     syllogism_implement!(
-        modus_ponens,
-        p q,
-        if_p_q,
-        two_p,
-        two_q,
+        fn modus_ponens(p, q) {
+            if_p_q;
+            two_p;
+            two_q;
+        }
     );
     syllogism_implement!(
-        modus_tollens,
-        p q,
-        if_p_q,
-        two_not_q,
-        two_not_p,
+        fn modus_tollens(p, q) {
+            if_p_q;
+            two_not_q;
+            two_not_p;
+        }
     );
     syllogism_implement!(
-        pure_hypothetical_syllogism,
-        p q r,
-        three_if_p_q,
-        three_if_q_r,
-        three_if_p_r,
+        fn pure_hypothetical_syllogism(p, q, r) {
+            three_if_p_q;
+            three_if_q_r;
+            three_if_p_r;
+        }
     );
     syllogism_implement!(
-        disjunctive_syllogism,
-        p q,
-        or,
-        two_not_p,
-        two_q,
+        fn disjunctive_syllogism(p, q) {
+            or;
+            two_not_p;
+            two_q;
+        }
     );
     syllogism_implement!(
-        conjunctive_dilemma,
-        p q r s,
-        four_and_if,
-        four_p_or_r,
-        four_q_or_s,
+        fn conjunctive_dilemma(p, q, r, s) {
+            four_and_if;
+            four_p_or_r;
+            four_q_or_s;
+        }
     );
     syllogism_implement!(
-        disjunctive_dilemma,
-        p q r s,
-        four_and_if,
-        four_not_q_or_not_s,
-        four_not_p_or_not_r,
+        fn disjunctive_dilemma(p, q, r, s) {
+            four_and_if;
+            four_not_q_or_not_s;
+            four_not_p_or_not_r;
+        }
     );
 
     pub fn conjunction(&self) -> Option<Arc<Expr>> {
