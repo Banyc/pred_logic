@@ -107,6 +107,45 @@ fn and_not(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
     })
 }
 
+replace! (
+    commutative_or,
+    p q,
+    or,
+    comm_or,
+);
+replace! (
+    commutative_and,
+    p q,
+    and,
+    comm_and,
+);
+/// ```math
+/// p ∨ q
+/// ```
+fn or(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
+    Expr::BinOp(BinOpExpr {
+        op: BinOp::Or,
+        left: p,
+        right: q,
+    })
+}
+fn comm_or(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
+    or(q, p)
+}
+/// ```math
+/// p ⋅ q
+/// ```
+fn and(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
+    Expr::BinOp(BinOpExpr {
+        op: BinOp::And,
+        left: p,
+        right: q,
+    })
+}
+fn comm_and(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
+    and(q, p)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::nat_deduct::tests::named_var_expr;
@@ -163,5 +202,31 @@ mod tests {
         let equiv = de_morgen_and_not(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼(p ∨ q)");
+    }
+
+    #[test]
+    fn test_com_or() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let expr = Arc::new(or(Arc::clone(&p), Arc::clone(&q)));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ∨ q");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = commutative_or(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "q ∨ p");
+    }
+
+    #[test]
+    fn test_com_and() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let expr = Arc::new(and(Arc::clone(&p), Arc::clone(&q)));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ⋅ q");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = commutative_and(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "q ⋅ p");
     }
 }
