@@ -6,17 +6,17 @@ use crate::{
 };
 
 macro_rules! replace {
-    ( $f:ident, $( $expr:ident )*, $pat:ident, $equiv:ident, ) => {
+    ( $f:ident, $( $var:ident )*, $pat:ident, $equiv:ident, ) => {
         pub fn $f(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
             let mut unnamed_space = unnamed_space.clone();
-            $( let $expr = Var::Unnamed(unnamed_space.gen()); )*
+            $( let $var = Var::Unnamed(unnamed_space.gen()); )*
             let pat = $pat(
-                $( Arc::new(Expr::Var($expr.clone())), )*
+                $( Arc::new(Expr::Var($var.clone())), )*
             );
             let captured = extract(expr, &pat)?;
-            $( let $expr = captured.get(& $expr).unwrap(); )*
+            $( let $var = captured.get(& $var).unwrap(); )*
             let equiv = Arc::new($equiv(
-                $( Arc::clone($expr), )*
+                $( Arc::clone($var), )*
             ));
             Some(equiv)
         }
