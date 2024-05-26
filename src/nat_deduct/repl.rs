@@ -70,21 +70,21 @@ pub fn de_morgen(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Exp
 }
 
 replace! (
-    fn commutative_or(p, q) {
+    fn commutativity_or(p, q) {
         or;
         comm_or;
     }
 );
 replace! (
-    fn commutative_and(p, q) {
+    fn commutativity_and(p, q) {
         and;
         comm_and;
     }
 );
-pub fn commutative(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn commutativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        commutative_or(expr, unnamed_space),
-        commutative_and(expr, unnamed_space),
+        commutativity_or(expr, unnamed_space),
+        commutativity_and(expr, unnamed_space),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
@@ -160,7 +160,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ∨ q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = commutative_or(&expr, &unnamed_space).unwrap();
+        let equiv = commutativity_or(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "q ∨ p");
     }
@@ -173,7 +173,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ⋅ q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = commutative_and(&expr, &unnamed_space).unwrap();
+        let equiv = commutativity_and(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "q ⋅ p");
     }
