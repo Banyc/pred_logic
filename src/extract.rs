@@ -4,6 +4,7 @@ use crate::expr::{Expr, Var};
 
 pub type VarExprMap = HashMap<Var, Arc<Expr>>;
 
+/// Return captured expressions referred by variables in the pattern
 pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
     match (src.as_ref(), pattern) {
         (_, Expr::Var(var)) => {
@@ -49,6 +50,7 @@ pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
     }
 }
 
+/// Merge two variable-to-expression tables together if the same variables refer to the same expressions
 pub fn merge(mut left: VarExprMap, right: VarExprMap) -> Option<VarExprMap> {
     for (k, r) in right {
         match left.get(&k) {
