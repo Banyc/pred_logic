@@ -234,7 +234,7 @@ pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::Named;
+    use crate::nat_deduct::tests::named_var_expr;
 
     use super::*;
 
@@ -503,9 +503,5 @@ mod tests {
                 right: q,
             })
         );
-    }
-
-    fn named_var_expr(name: &str) -> Arc<Expr> {
-        Arc::new(Expr::Var(Var::Named(Named { name: name.into() })))
     }
 }
