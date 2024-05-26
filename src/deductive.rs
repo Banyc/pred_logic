@@ -140,6 +140,57 @@ impl Syllogism {
         Some(conclusion)
     }
 
+    pub fn disjunctive_dilemma(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+        let mut unnamed_space = unnamed_space.clone();
+        let p = Var::Unnamed(unnamed_space.gen());
+        let q = Var::Unnamed(unnamed_space.gen());
+        let r = Var::Unnamed(unnamed_space.gen());
+        let s = Var::Unnamed(unnamed_space.gen());
+        let p_expr = Arc::new(Expr::Var(p.clone()));
+        let q_expr = Arc::new(Expr::Var(q.clone()));
+        let r_expr = Arc::new(Expr::Var(r.clone()));
+        let s_expr = Arc::new(Expr::Var(s.clone()));
+        let major_prem = Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::new(Expr::BinOp(BinOpExpr {
+                op: BinOp::If,
+                left: Arc::clone(&p_expr),
+                right: Arc::clone(&q_expr),
+            })),
+            right: Arc::new(Expr::BinOp(BinOpExpr {
+                op: BinOp::If,
+                left: Arc::clone(&r_expr),
+                right: Arc::clone(&s_expr),
+            })),
+        });
+        let minor_prem = Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(&p_expr),
+            })),
+            right: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(&r_expr),
+            })),
+        });
+        let captured = self.extract(&major_prem, &minor_prem)?;
+        let q = captured.get(&q).unwrap();
+        let s = captured.get(&s).unwrap();
+        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(q),
+            })),
+            right: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(s),
+            })),
+        }));
+        Some(conclusion)
+    }
+
     fn extract(&self, major_pattern: &Expr, minor_patter: &Expr) -> Option<VarExprMap> {
         let captured_1 = extract(&self.major_prem, major_pattern)?;
         let captured_2 = extract(&self.minor_prem, minor_patter)?;
@@ -306,6 +357,61 @@ mod tests {
                 op: BinOp::Or,
                 left: q,
                 right: s,
+            })
+        );
+    }
+
+    #[test]
+    fn test_dd() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let s = named_var_expr("s");
+        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::new(Expr::BinOp(BinOpExpr {
+                op: BinOp::If,
+                left: Arc::clone(&p),
+                right: Arc::clone(&q),
+            })),
+            right: Arc::new(Expr::BinOp(BinOpExpr {
+                op: BinOp::If,
+                left: Arc::clone(&r),
+                right: Arc::clone(&s),
+            })),
+        }));
+        let minor_prem = Arc::new(Expr::BinOp(BinOpExpr {
+            op: BinOp::And,
+            left: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(&p),
+            })),
+            right: Arc::new(Expr::UnOp(UnOpExpr {
+                op: UnOp::Not,
+                expr: Arc::clone(&r),
+            })),
+        }));
+        println!("{major_prem}");
+        println!("{minor_prem}");
+        let syllogism = Syllogism {
+            major_prem,
+            minor_prem,
+        };
+        let unnamed_space = UnnamedGen::new();
+        let conclusion = syllogism.disjunctive_dilemma(&unnamed_space).unwrap();
+        println!("{conclusion}");
+        assert_eq!(
+            conclusion.as_ref(),
+            &Expr::BinOp(BinOpExpr {
+                op: BinOp::And,
+                left: Arc::new(Expr::UnOp(UnOpExpr {
+                    op: UnOp::Not,
+                    expr: q,
+                })),
+                right: Arc::new(Expr::UnOp(UnOpExpr {
+                    op: UnOp::Not,
+                    expr: s,
+                })),
             })
         );
     }
