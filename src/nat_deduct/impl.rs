@@ -200,9 +200,9 @@ impl Syllogism<'_> {
         Some(conclusion)
     }
 
-    fn extract(&self, major_pattern: &Expr, minor_patter: &Expr) -> Option<VarExprMap> {
+    fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<VarExprMap> {
         let captured_1 = extract(self.major_prem, major_pattern)?;
-        let captured_2 = extract(self.minor_prem, minor_patter)?;
+        let captured_2 = extract(self.minor_prem, minor_pattern)?;
         merge(captured_1, captured_2)
     }
 }
