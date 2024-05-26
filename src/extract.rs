@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::expr::{Expr, Var};
+use crate::expr::{BinOpExpr, Expr, UnOpExpr, Var};
 
 pub type VarExprMap = HashMap<Var, Arc<Expr>>;
 
@@ -55,4 +55,26 @@ pub fn merge(mut left: VarExprMap, right: VarExprMap) -> Option<VarExprMap> {
         }
     }
     Some(left)
+}
+
+/// Replace variables to given expressions
+pub fn replace(src: &Arc<Expr>, map: &VarExprMap) -> Arc<Expr> {
+    match src.as_ref() {
+        Expr::Var(x) => {
+            let Some(expr) = map.get(x) else {
+                return Arc::clone(src);
+            };
+            Arc::clone(expr)
+        }
+        Expr::Pred(_) | Expr::EquivInd(_) => Arc::clone(src),
+        Expr::BinOp(x) => Arc::new(Expr::BinOp(BinOpExpr {
+            op: x.op.clone(),
+            left: replace(&x.left, map),
+            right: replace(&x.right, map),
+        })),
+        Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
+            op: x.op.clone(),
+            expr: replace(&x.expr, map),
+        })),
+    }
 }
