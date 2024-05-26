@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    expr::{BinOp, BinOpExpr, Expr, UnOp, UnOpExpr, UnnamedGen, Var},
+    expr::{Expr, UnnamedGen, Var},
     extract::extract,
 };
+
+use super::{and, comm_and, comm_or, or, two_and_not, two_not_and, two_not_or, two_or_not};
 
 macro_rules! replace {
     ( $f:ident, $( $var:ident )*, $pat:ident, $equiv:ident, ) => {
@@ -15,9 +17,9 @@ macro_rules! replace {
             );
             let captured = extract(expr, &pat)?;
             $( let $var = captured.get(& $var).unwrap(); )*
-            let equiv = Arc::new($equiv(
+            let equiv = $equiv(
                 $( Arc::clone($var), )*
-            ));
+            );
             Some(equiv)
         }
     };
@@ -26,86 +28,27 @@ macro_rules! replace {
 replace! (
     de_morgen_not_and,
     p q,
-    not_and,
-    or_not,
+    two_not_and,
+    two_or_not,
 );
 replace! (
     de_morgen_or_not,
     p q,
-    or_not,
-    not_and,
+    two_or_not,
+    two_not_and,
 );
-/// ```math
-/// ∼(p ⋅ q)
-/// ```
-fn not_and(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::UnOp(UnOpExpr {
-        op: UnOp::Not,
-        expr: Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: p,
-            right: q,
-        })),
-    })
-}
-/// ```math
-/// ∼p ∨ ∼q
-/// ```
-fn or_not(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::BinOp(BinOpExpr {
-        op: BinOp::Or,
-        left: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p,
-        })),
-        right: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: q,
-        })),
-    })
-}
-
 replace! (
     de_morgen_not_or,
     p q,
-    not_or,
-    and_not,
+    two_not_or,
+    two_and_not,
 );
 replace! (
     de_morgen_and_not,
     p q,
-    and_not,
-    not_or,
+    two_and_not,
+    two_not_or,
 );
-/// ```math
-/// ∼(p ∨ q)
-/// ```
-fn not_or(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::UnOp(UnOpExpr {
-        op: UnOp::Not,
-        expr: Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: p,
-            right: q,
-        })),
-    })
-}
-/// ```math
-/// ∼p ⋅ ∼q
-/// ```
-fn and_not(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::BinOp(BinOpExpr {
-        op: BinOp::And,
-        left: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p,
-        })),
-        right: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: q,
-        })),
-    })
-}
 
 replace! (
     commutative_or,
@@ -119,32 +62,6 @@ replace! (
     and,
     comm_and,
 );
-/// ```math
-/// p ∨ q
-/// ```
-fn or(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::BinOp(BinOpExpr {
-        op: BinOp::Or,
-        left: p,
-        right: q,
-    })
-}
-fn comm_or(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    or(q, p)
-}
-/// ```math
-/// p ⋅ q
-/// ```
-fn and(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    Expr::BinOp(BinOpExpr {
-        op: BinOp::And,
-        left: p,
-        right: q,
-    })
-}
-fn comm_and(p: Arc<Expr>, q: Arc<Expr>) -> Expr {
-    and(q, p)
-}
 
 #[cfg(test)]
 mod tests {
@@ -156,7 +73,7 @@ mod tests {
     fn test_dm_not_and() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let expr = Arc::new(not_and(Arc::clone(&p), Arc::clone(&q)));
+        let expr = Arc::new(two_not_and(Arc::clone(&p), Arc::clone(&q)));
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼(p ⋅ q)");
         let unnamed_space = UnnamedGen::new();
@@ -169,7 +86,7 @@ mod tests {
     fn test_dm_or_not() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let expr = Arc::new(or_not(Arc::clone(&p), Arc::clone(&q)));
+        let expr = Arc::new(two_or_not(Arc::clone(&p), Arc::clone(&q)));
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼p ∨ ∼q");
         let unnamed_space = UnnamedGen::new();
@@ -182,7 +99,7 @@ mod tests {
     fn test_dm_not_or() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let expr = Arc::new(not_or(Arc::clone(&p), Arc::clone(&q)));
+        let expr = Arc::new(two_not_or(Arc::clone(&p), Arc::clone(&q)));
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼(p ∨ q)");
         let unnamed_space = UnnamedGen::new();
@@ -195,7 +112,7 @@ mod tests {
     fn test_dm_and_not() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let expr = Arc::new(and_not(Arc::clone(&p), Arc::clone(&q)));
+        let expr = Arc::new(two_and_not(Arc::clone(&p), Arc::clone(&q)));
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼p ⋅ ∼q");
         let unnamed_space = UnnamedGen::new();

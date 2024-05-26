@@ -1,9 +1,35 @@
 use std::sync::Arc;
 
 use crate::{
-    expr::{BinOp, BinOpExpr, Expr, UnOp, UnOpExpr, UnnamedGen, Var},
+    expr::{Expr, UnnamedGen, Var},
     extract::{extract, merge, VarExprMap},
 };
+
+use super::{
+    and, four_and_if, four_not_p_or_not_r, four_not_q_or_not_s, four_p_or_r, four_q_or_s, if_p_q,
+    or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q, two_p, two_q,
+};
+
+macro_rules! syllogism_implement {
+    ( $f:ident, $( $var:ident )*, $major_pat:ident, $minor_pat:ident, $conclusion:ident, ) => {
+        pub fn $f(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+            let mut unnamed_space = unnamed_space.clone();
+            $( let $var = Var::Unnamed(unnamed_space.gen()); )*
+            let major_pat = $major_pat(
+                $( Arc::new(Expr::Var($var.clone())), )*
+            );
+            let minor_pat = $minor_pat(
+                $( Arc::new(Expr::Var($var.clone())), )*
+            );
+            let captured = self.extract(&major_pat, &minor_pat)?;
+            $( let $var = captured.get(& $var).unwrap(); )*
+            let conclusion = $conclusion(
+                $( Arc::clone($var), )*
+            );
+            Some(conclusion)
+        }
+    };
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Syllogism<'a> {
@@ -11,192 +37,51 @@ pub struct Syllogism<'a> {
     pub minor_prem: &'a Arc<Expr>,
 }
 impl Syllogism<'_> {
-    pub fn modus_ponens(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: Arc::clone(&p_expr),
-            right: Arc::clone(&q_expr),
-        });
-        let minor_prem = Arc::clone(&p_expr);
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let conclusion = captured.get(&q).unwrap();
-        Some(Arc::clone(conclusion))
-    }
-
-    pub fn modus_tollens(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: Arc::clone(&p_expr),
-            right: Arc::clone(&q_expr),
-        });
-        let minor_prem = Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: Arc::clone(&q_expr),
-        });
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let p = captured.get(&p).unwrap();
-        let conclusion = Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: Arc::clone(p),
-        }));
-        Some(conclusion)
-    }
-
-    pub fn pure_hypothetical_syllogism(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let r = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let r_expr = Arc::new(Expr::Var(r.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: Arc::clone(&p_expr),
-            right: Arc::clone(&q_expr),
-        });
-        let minor_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: Arc::clone(&q_expr),
-            right: Arc::clone(&r_expr),
-        });
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let p = captured.get(&p).unwrap();
-        let r = captured.get(&r).unwrap();
-        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: Arc::clone(p),
-            right: Arc::clone(r),
-        }));
-        Some(conclusion)
-    }
-
-    pub fn disjunctive_syllogism(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: p_expr.clone(),
-            right: q_expr.clone(),
-        });
-        let minor_prem = Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p_expr.clone(),
-        });
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let conclusion = captured.get(&q).unwrap();
-        Some(Arc::clone(conclusion))
-    }
-
-    pub fn conjunctive_dilemma(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let r = Var::Unnamed(unnamed_space.gen());
-        let s = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let r_expr = Arc::new(Expr::Var(r.clone()));
-        let s_expr = Arc::new(Expr::Var(s.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&p_expr),
-                right: Arc::clone(&q_expr),
-            })),
-            right: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&r_expr),
-                right: Arc::clone(&s_expr),
-            })),
-        });
-        let minor_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: Arc::clone(&p_expr),
-            right: Arc::clone(&r_expr),
-        });
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let q = captured.get(&q).unwrap();
-        let s = captured.get(&s).unwrap();
-        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: Arc::clone(q),
-            right: Arc::clone(s),
-        }));
-        Some(conclusion)
-    }
-
-    pub fn disjunctive_dilemma(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        let mut unnamed_space = unnamed_space.clone();
-        let p = Var::Unnamed(unnamed_space.gen());
-        let q = Var::Unnamed(unnamed_space.gen());
-        let r = Var::Unnamed(unnamed_space.gen());
-        let s = Var::Unnamed(unnamed_space.gen());
-        let p_expr = Arc::new(Expr::Var(p.clone()));
-        let q_expr = Arc::new(Expr::Var(q.clone()));
-        let r_expr = Arc::new(Expr::Var(r.clone()));
-        let s_expr = Arc::new(Expr::Var(s.clone()));
-        let major_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&p_expr),
-                right: Arc::clone(&q_expr),
-            })),
-            right: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&r_expr),
-                right: Arc::clone(&s_expr),
-            })),
-        });
-        let minor_prem = Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(&p_expr),
-            })),
-            right: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(&r_expr),
-            })),
-        });
-        let captured = self.extract(&major_prem, &minor_prem)?;
-        let q = captured.get(&q).unwrap();
-        let s = captured.get(&s).unwrap();
-        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(q),
-            })),
-            right: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(s),
-            })),
-        }));
-        Some(conclusion)
-    }
+    syllogism_implement!(
+        modus_ponens,
+        p q,
+        if_p_q,
+        two_p,
+        two_q,
+    );
+    syllogism_implement!(
+        modus_tollens,
+        p q,
+        if_p_q,
+        two_not_q,
+        two_not_p,
+    );
+    syllogism_implement!(
+        pure_hypothetical_syllogism,
+        p q r,
+        three_if_p_q,
+        three_if_q_r,
+        three_if_p_r,
+    );
+    syllogism_implement!(
+        disjunctive_syllogism,
+        p q,
+        or,
+        two_not_p,
+        two_q,
+    );
+    syllogism_implement!(
+        conjunctive_dilemma,
+        p q r s,
+        four_and_if,
+        four_p_or_r,
+        four_q_or_s,
+    );
+    syllogism_implement!(
+        disjunctive_dilemma,
+        p q r s,
+        four_and_if,
+        four_not_q_or_not_s,
+        four_not_p_or_not_r,
+    );
 
     pub fn conjunction(&self) -> Option<Arc<Expr>> {
-        let conclusion = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::clone(self.major_prem),
-            right: Arc::clone(self.minor_prem),
-        }));
+        let conclusion = and(Arc::clone(self.major_prem), Arc::clone(self.minor_prem));
         Some(conclusion)
     }
 
@@ -213,28 +98,20 @@ pub fn simplification(prem: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Ar
     let q = Var::Unnamed(unnamed_space.gen());
     let p_expr = Arc::new(Expr::Var(p.clone()));
     let q_expr = Arc::new(Expr::Var(q.clone()));
-    let pat = Expr::BinOp(BinOpExpr {
-        op: BinOp::And,
-        left: Arc::clone(&p_expr),
-        right: Arc::clone(&q_expr),
-    });
+    let pat = and(Arc::clone(&p_expr), Arc::clone(&q_expr));
     let captured = extract(prem, &pat)?;
     let conclusion = captured.get(&p).unwrap();
     Some(Arc::clone(conclusion))
 }
 
 pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
-    let conclusion = Expr::BinOp(BinOpExpr {
-        op: BinOp::Or,
-        left: Arc::clone(prem),
-        right: q,
-    });
-    Some(Arc::new(conclusion))
+    let conclusion = or(Arc::clone(prem), q);
+    Some(conclusion)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::nat_deduct::tests::named_var_expr;
+    use crate::nat_deduct::{not, tests::named_var_expr};
 
     use super::*;
 
@@ -242,14 +119,12 @@ mod tests {
     fn test_mp() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: p.clone(),
-            right: q.clone(),
-        }));
+        let major_prem = if_p_q(p.clone(), q.clone());
         let minor_prem = p.clone();
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "p ⊃ q");
+        assert_eq!(minor_prem.to_string(), "p");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -257,24 +132,19 @@ mod tests {
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism.modus_ponens(&unnamed_space).unwrap();
         println!("{conclusion}");
-        assert_eq!(conclusion, q);
+        assert_eq!(conclusion.to_string(), "q");
     }
 
     #[test]
     fn test_mt() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: p.clone(),
-            right: q.clone(),
-        }));
-        let minor_prem = Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: q.clone(),
-        }));
+        let major_prem = if_p_q(p.clone(), q.clone());
+        let minor_prem = not(q.clone());
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "p ⊃ q");
+        assert_eq!(minor_prem.to_string(), "∼q");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -282,13 +152,7 @@ mod tests {
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism.modus_tollens(&unnamed_space).unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: p.clone()
-            })
-        );
+        assert_eq!(conclusion.to_string(), "∼p");
     }
 
     #[test]
@@ -296,18 +160,12 @@ mod tests {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
         let r = named_var_expr("r");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: p.clone(),
-            right: q.clone(),
-        }));
-        let minor_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::If,
-            left: q.clone(),
-            right: r.clone(),
-        }));
+        let major_prem = if_p_q(p.clone(), q.clone());
+        let minor_prem = if_p_q(q.clone(), r.clone());
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "p ⊃ q");
+        assert_eq!(minor_prem.to_string(), "q ⊃ r");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -317,31 +175,19 @@ mod tests {
             .pure_hypothetical_syllogism(&unnamed_space)
             .unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: p.clone(),
-                right: r.clone(),
-            })
-        );
+        assert_eq!(conclusion.to_string(), "p ⊃ r");
     }
 
     #[test]
     fn test_ds() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: p.clone(),
-            right: q.clone(),
-        }));
-        let minor_prem = Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p.clone(),
-        }));
+        let major_prem = or(p.clone(), q.clone());
+        let minor_prem = not(p.clone());
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "p ∨ q");
+        assert_eq!(minor_prem.to_string(), "∼p");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -349,7 +195,7 @@ mod tests {
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism.disjunctive_syllogism(&unnamed_space).unwrap();
         println!("{conclusion}");
-        assert_eq!(conclusion, q);
+        assert_eq!(conclusion.to_string(), "q");
     }
 
     #[test]
@@ -358,26 +204,12 @@ mod tests {
         let q = named_var_expr("q");
         let r = named_var_expr("r");
         let s = named_var_expr("s");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&p),
-                right: Arc::clone(&q),
-            })),
-            right: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&r),
-                right: Arc::clone(&s),
-            })),
-        }));
-        let minor_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: Arc::clone(&p),
-            right: Arc::clone(&r),
-        }));
+        let major_prem = four_and_if(p.clone(), q.clone(), r.clone(), s.clone());
+        let minor_prem = or(p.clone(), r.clone());
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "(p ⊃ q) ⋅ (r ⊃ s)");
+        assert_eq!(minor_prem.to_string(), "p ∨ r");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -385,14 +217,7 @@ mod tests {
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism.conjunctive_dilemma(&unnamed_space).unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::BinOp(BinOpExpr {
-                op: BinOp::Or,
-                left: q,
-                right: s,
-            })
-        );
+        assert_eq!(conclusion.to_string(), "q ∨ s");
     }
 
     #[test]
@@ -401,32 +226,12 @@ mod tests {
         let q = named_var_expr("q");
         let r = named_var_expr("r");
         let s = named_var_expr("s");
-        let major_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&p),
-                right: Arc::clone(&q),
-            })),
-            right: Arc::new(Expr::BinOp(BinOpExpr {
-                op: BinOp::If,
-                left: Arc::clone(&r),
-                right: Arc::clone(&s),
-            })),
-        }));
-        let minor_prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(&p),
-            })),
-            right: Arc::new(Expr::UnOp(UnOpExpr {
-                op: UnOp::Not,
-                expr: Arc::clone(&r),
-            })),
-        }));
+        let major_prem = four_and_if(p.clone(), q.clone(), r.clone(), s.clone());
+        let minor_prem = or(not(q.clone()), not(s.clone()));
         println!("{major_prem}");
         println!("{minor_prem}");
+        assert_eq!(major_prem.to_string(), "(p ⊃ q) ⋅ (r ⊃ s)");
+        assert_eq!(minor_prem.to_string(), "∼q ∨ ∼s");
         let syllogism = Syllogism {
             major_prem: &major_prem,
             minor_prem: &minor_prem,
@@ -434,20 +239,7 @@ mod tests {
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism.disjunctive_dilemma(&unnamed_space).unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::BinOp(BinOpExpr {
-                op: BinOp::And,
-                left: Arc::new(Expr::UnOp(UnOpExpr {
-                    op: UnOp::Not,
-                    expr: q,
-                })),
-                right: Arc::new(Expr::UnOp(UnOpExpr {
-                    op: UnOp::Not,
-                    expr: s,
-                })),
-            })
-        );
+        assert_eq!(conclusion.to_string(), "∼p ∨ ∼r");
     }
 
     #[test]
@@ -462,29 +254,20 @@ mod tests {
         };
         let conclusion = syllogism.conjunction().unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::BinOp(BinOpExpr {
-                op: BinOp::And,
-                left: p,
-                right: q,
-            })
-        );
+        assert_eq!(conclusion.to_string(), "p ⋅ q");
     }
 
     #[test]
     fn test_simp() {
         let p = named_var_expr("p");
         let q = named_var_expr("q");
-        let prem = Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: Arc::clone(&p),
-            right: Arc::clone(&q),
-        }));
+        let prem = and(p.clone(), q.clone());
         println!("{prem}");
+        assert_eq!(prem.to_string(), "p ⋅ q");
         let unnamed_space = UnnamedGen::new();
         let conclusion = simplification(&prem, &unnamed_space).unwrap();
         println!("{conclusion}");
+        assert_eq!(conclusion.to_string(), "p");
         assert_eq!(conclusion, p);
     }
 
@@ -495,13 +278,6 @@ mod tests {
         println!("{p}");
         let conclusion = addition(&p, q.clone()).unwrap();
         println!("{conclusion}");
-        assert_eq!(
-            conclusion.as_ref(),
-            &Expr::BinOp(BinOpExpr {
-                op: BinOp::Or,
-                left: p,
-                right: q,
-            })
-        );
+        assert_eq!(conclusion.to_string(), "p ∨ q");
     }
 }
