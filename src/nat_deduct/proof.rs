@@ -1,13 +1,14 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     expr::{Expr, UnnamedGen, Var},
-    extract::extract,
+    extract::{self, extract},
 };
 
 use super::{
     and, not,
     r#impl::{addition, simplification, Syllogism},
+    repl::{self, ReplacementOp},
 };
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,9 @@ impl Proof {
     }
     pub fn conclusion(&self) -> &Arc<Expr> {
         &self.conclusion
+    }
+    pub fn unnamed_space(&self) -> &UnnamedGen {
+        &self.unnamed_space
     }
 
     pub fn syllogism(&mut self, major_prem: usize, minor_prem: usize) {
@@ -60,6 +64,22 @@ impl Proof {
         self.premises.push(expr);
     }
 
+    pub fn replace(&mut self, prem: usize, pat: &Arc<Expr>, var: Var, op: ReplacementOp) {
+        let prem = &self.premises[prem];
+        let Some(captured) = extract(prem, pat) else {
+            return;
+        };
+        let Some(expr) = captured.get(&var) else {
+            return;
+        };
+        let Some(equiv) = repl::replace(expr, op, self.unnamed_space.clone()) else {
+            return;
+        };
+        let map = HashMap::from_iter([(var, equiv)]);
+        let new = extract::replace(pat, &map);
+        self.premises.push(new);
+    }
+
     pub fn conclude(&self) -> bool {
         self.premises.contains(&self.conclusion)
     }
@@ -79,7 +99,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_proof() {
+    fn test_proof_impl() {
         let a = named_var_expr("A");
         let b = named_var_expr("B");
         let c = named_var_expr("C");
@@ -103,9 +123,87 @@ mod tests {
         assert!(proof.conclude());
     }
 
+    #[test]
+    fn test_proof_repl() {
+        let a = named_var_expr("A");
+        let b = named_var_expr("B");
+        let c = named_var_expr("C");
+        let premises = [
+            if_p_q(a.clone(), not(and(b.clone(), c.clone()))),
+            and(a.clone(), c.clone()),
+        ]
+        .into();
+        let conclusion = not(b.clone());
+        let mut proof = Proof::new(premises, conclusion);
+        print_premises(proof.premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof.simplification(1);
+        print_premises(proof.premises());
+        println!();
+        proof.syllogism(0, 2);
+        print_premises(proof.premises());
+        println!();
+        {
+            let mut unnamed_space = proof.unnamed_space().clone();
+            let x = Var::Unnamed(unnamed_space.gen());
+            proof.replace(
+                3,
+                &Arc::new(Expr::Var(x.clone())),
+                x,
+                ReplacementOp::DeMorgen,
+            );
+        }
+        print_premises(proof.premises());
+        println!();
+        {
+            let mut unnamed_space = proof.unnamed_space().clone();
+            let x = Var::Unnamed(unnamed_space.gen());
+            proof.replace(
+                1,
+                &Arc::new(Expr::Var(x.clone())),
+                x,
+                ReplacementOp::Commutativity,
+            );
+        }
+        print_premises(proof.premises());
+        println!();
+        proof.simplification(5);
+        print_premises(proof.premises());
+        println!();
+        {
+            let mut unnamed_space = proof.unnamed_space().clone();
+            let x = Var::Unnamed(unnamed_space.gen());
+            proof.replace(
+                4,
+                &Arc::new(Expr::Var(x.clone())),
+                x,
+                ReplacementOp::Commutativity,
+            );
+        }
+        print_premises(proof.premises());
+        println!();
+        {
+            let mut unnamed_space = proof.unnamed_space().clone();
+            let x = Var::Unnamed(unnamed_space.gen());
+            proof.replace(
+                6,
+                &Arc::new(Expr::Var(x.clone())),
+                x,
+                ReplacementOp::DoubleNegation,
+            );
+        }
+        print_premises(proof.premises());
+        println!();
+        proof.syllogism(7, 8);
+        print_premises(proof.premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
     fn print_premises(premises: &[Arc<Expr>]) {
-        for prem in premises {
-            println!("{prem}");
+        for (i, prem) in premises.iter().enumerate() {
+            println!("{i}. {prem}");
         }
     }
 }

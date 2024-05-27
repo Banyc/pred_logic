@@ -12,13 +12,78 @@ use super::{
     two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
+#[derive(Debug, Clone)]
+pub enum ReplacementOp {
+    /// ```math
+    /// ∼(p ⋅ q) :: (∼p ∨ ∼q) \\
+    /// ∼(p ∨ q) :: (∼p ⋅ ∼q) \\
+    /// ```
+    DeMorgen,
+    /// ```math
+    /// (p ∨ q) :: (q ∨ p) \\
+    /// (p ⋅ q) :: (q ⋅ p) \\
+    /// ```
+    Commutativity,
+    /// ```math
+    /// [p ∨ (q ∨ r)] :: [(p ∨ q) ∨ r] \\
+    /// [p ⋅ (q ⋅ r)] :: [(p ⋅ q) ⋅ r] \\
+    /// ```
+    Associativity,
+    /// ```math
+    /// [p ⋅ (q ∨ r)] :: [(p ⋅ q) ∨ (p ⋅ r)] \\
+    /// [p ∨ (q ⋅ r)] :: [(p ∨ q) ⋅ (p ∨ r)] \\
+    /// ```
+    Distribution,
+    /// ```math
+    /// p :: ∼∼p
+    /// ```
+    DoubleNegation,
+    /// ```math
+    /// (p ⊃ q) :: (∼q ⊃ ∼p)
+    /// ```
+    Transposition,
+    /// ```math
+    /// (p ⊃ q) :: (∼p ∨ q)
+    /// ```
+    MaterialImplication,
+    /// ```math
+    /// [(p ⋅ q) ⊃ r] :: [p ⊃ (q ⊃ r)]
+    /// ```
+    Exportation,
+    /// ```math
+    /// p :: (p ⋅ p)
+    /// ```
+    TautologyAnd,
+    /// ```math
+    /// p :: (p ∨ p)
+    /// ```
+    TautologyOr,
+}
+pub fn replace(
+    expr: &Arc<Expr>,
+    op: ReplacementOp,
+    unnamed_space: UnnamedGen,
+) -> Option<Arc<Expr>> {
+    match op {
+        ReplacementOp::DeMorgen => de_morgen(expr, unnamed_space.clone()),
+        ReplacementOp::Commutativity => commutativity(expr, unnamed_space.clone()),
+        ReplacementOp::Associativity => associativity(expr, unnamed_space.clone()),
+        ReplacementOp::Distribution => distribution(expr, unnamed_space.clone()),
+        ReplacementOp::DoubleNegation => Some(double_negation(expr, unnamed_space.clone())),
+        ReplacementOp::Transposition => transposition(expr, unnamed_space.clone()),
+        ReplacementOp::MaterialImplication => material_implication(expr, unnamed_space.clone()),
+        ReplacementOp::Exportation => exportation(expr, unnamed_space.clone()),
+        ReplacementOp::TautologyAnd => Some(tautology_and(expr, unnamed_space.clone())),
+        ReplacementOp::TautologyOr => Some(tautology_or(expr, unnamed_space.clone())),
+    }
+}
+
 macro_rules! replace {
     ( fn $f:ident ( $( $var:ident ),* ) {
         $pat:ident;
         $equiv:ident;
     } ) => {
-        pub fn $f(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-            let mut unnamed_space = unnamed_space.clone();
+        pub fn $f(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
             let pat = $pat(
                 $( Arc::new(Expr::Var($var.clone())), )*
@@ -57,12 +122,12 @@ replace! (
         two_not_or;
     }
 );
-pub fn de_morgen(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn de_morgen(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        de_morgen_not_and(expr, unnamed_space),
-        de_morgen_or_not(expr, unnamed_space),
-        de_morgen_not_or(expr, unnamed_space),
-        de_morgen_and_not(expr, unnamed_space),
+        de_morgen_not_and(expr, unnamed_space.clone()),
+        de_morgen_or_not(expr, unnamed_space.clone()),
+        de_morgen_not_or(expr, unnamed_space.clone()),
+        de_morgen_and_not(expr, unnamed_space.clone()),
     ) {
         (Some(x), _, _, _) | // _
         (_, Some(x), _, _) | // _
@@ -86,10 +151,10 @@ replace! (
         comm_and;
     }
 );
-pub fn commutativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn commutativity(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        commutativity_or(expr, unnamed_space),
-        commutativity_and(expr, unnamed_space),
+        commutativity_or(expr, unnamed_space.clone()),
+        commutativity_and(expr, unnamed_space.clone()),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
@@ -123,12 +188,12 @@ replace! (
         left_assoc_and;
     }
 );
-pub fn associativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn associativity(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        associativity_left_right_or(expr, unnamed_space),
-        associativity_right_left_or(expr, unnamed_space),
-        associativity_left_right_and(expr, unnamed_space),
-        associativity_right_left_and(expr, unnamed_space),
+        associativity_left_right_or(expr, unnamed_space.clone()),
+        associativity_right_left_or(expr, unnamed_space.clone()),
+        associativity_left_right_and(expr, unnamed_space.clone()),
+        associativity_right_left_and(expr, unnamed_space.clone()),
     ) {
         (Some(x), _, _, _) | // _
         (_, Some(x), _, _) | // _
@@ -164,12 +229,12 @@ replace! (
         or_and;
     }
 );
-pub fn distribution(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn distribution(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        distribution_expand_and(expr, unnamed_space),
-        distribution_collapse_or(expr, unnamed_space),
-        distribution_expand_or(expr, unnamed_space),
-        distribution_collapse_and(expr, unnamed_space),
+        distribution_expand_and(expr, unnamed_space.clone()),
+        distribution_collapse_or(expr, unnamed_space.clone()),
+        distribution_expand_or(expr, unnamed_space.clone()),
+        distribution_collapse_and(expr, unnamed_space.clone()),
     ) {
         (Some(x), _, _, _) | // _
         (_, Some(x), _, _) | // _
@@ -193,18 +258,11 @@ replace! (
         one_p;
     }
 );
-pub fn double_negation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-    match (
-        // Try to cancel out the double nots first
-        double_negation_double(expr, unnamed_space),
-        double_negation_empty(expr, unnamed_space),
-    ) {
-        (Some(x), _) | // _
-        (_, Some(x)) => {
-            Some(x)
-        }
-        _ => None,
+pub fn double_negation(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Arc<Expr> {
+    if let Some(x) = double_negation_double(expr, unnamed_space.clone()) {
+        return x;
     }
+    double_negation_empty(expr, unnamed_space.clone()).unwrap()
 }
 
 replace! (
@@ -219,10 +277,10 @@ replace! (
         if_p_q;
     }
 );
-pub fn transposition(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn transposition(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        transposition_empty(expr, unnamed_space),
-        transposition_not(expr, unnamed_space),
+        transposition_empty(expr, unnamed_space.clone()),
+        transposition_not(expr, unnamed_space.clone()),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
@@ -244,10 +302,10 @@ replace! (
         if_p_q;
     }
 );
-pub fn material_implication(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn material_implication(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        material_implication_if(expr, unnamed_space),
-        material_implication_or(expr, unnamed_space),
+        material_implication_if(expr, unnamed_space.clone()),
+        material_implication_or(expr, unnamed_space.clone()),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
@@ -269,10 +327,10 @@ replace! (
         both_p_q_then_r;
     }
 );
-pub fn exportation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+pub fn exportation(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
-        exportation_and(expr, unnamed_space),
-        exportation_if(expr, unnamed_space),
+        exportation_and(expr, unnamed_space.clone()),
+        exportation_if(expr, unnamed_space.clone()),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
@@ -294,18 +352,11 @@ replace! (
         one_p;
     }
 );
-pub fn tautology_and(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-    match (
-        // Try to cancel out the redundancy first
-        tautology_and_empty(expr, unnamed_space),
-        tautology_empty_and(expr, unnamed_space),
-    ) {
-        (Some(x), _) | // _
-        (_, Some(x)) => {
-            Some(x)
-        }
-        _ => None,
+pub fn tautology_and(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Arc<Expr> {
+    if let Some(x) = tautology_and_empty(expr, unnamed_space.clone()) {
+        return x;
     }
+    tautology_empty_and(expr, unnamed_space.clone()).unwrap()
 }
 
 replace! (
@@ -320,18 +371,11 @@ replace! (
         one_p;
     }
 );
-pub fn tautology_or(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-    match (
-        // Try to cancel out the redundancy first
-        tautology_or_empty(expr, unnamed_space),
-        tautology_empty_or(expr, unnamed_space),
-    ) {
-        (Some(x), _) | // _
-        (_, Some(x)) => {
-            Some(x)
-        }
-        _ => None,
+pub fn tautology_or(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Arc<Expr> {
+    if let Some(x) = tautology_or_empty(expr, unnamed_space.clone()) {
+        return x;
     }
+    tautology_empty_or(expr, unnamed_space.clone()).unwrap()
 }
 
 #[cfg(test)]
@@ -348,7 +392,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼(p ⋅ q)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = de_morgen_not_and(&expr, &unnamed_space).unwrap();
+        let equiv = de_morgen_not_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼p ∨ ∼q");
     }
@@ -361,7 +405,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼p ∨ ∼q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = de_morgen_or_not(&expr, &unnamed_space).unwrap();
+        let equiv = de_morgen_or_not(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼(p ⋅ q)");
     }
@@ -374,7 +418,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼(p ∨ q)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = de_morgen_not_or(&expr, &unnamed_space).unwrap();
+        let equiv = de_morgen_not_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼p ⋅ ∼q");
     }
@@ -387,7 +431,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼p ⋅ ∼q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = de_morgen_and_not(&expr, &unnamed_space).unwrap();
+        let equiv = de_morgen_and_not(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼(p ∨ q)");
     }
@@ -400,7 +444,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ∨ q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = commutativity_or(&expr, &unnamed_space).unwrap();
+        let equiv = commutativity_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "q ∨ p");
     }
@@ -413,7 +457,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ⋅ q");
         let unnamed_space = UnnamedGen::new();
-        let equiv = commutativity_and(&expr, &unnamed_space).unwrap();
+        let equiv = commutativity_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "q ⋅ p");
     }
@@ -427,7 +471,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "(p ∨ q) ∨ r");
         let unnamed_space = UnnamedGen::new();
-        let equiv = associativity_left_right_or(&expr, &unnamed_space).unwrap();
+        let equiv = associativity_left_right_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p ∨ (q ∨ r)");
     }
@@ -441,7 +485,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ∨ (q ∨ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = associativity_right_left_or(&expr, &unnamed_space).unwrap();
+        let equiv = associativity_right_left_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "(p ∨ q) ∨ r");
     }
@@ -455,7 +499,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "(p ⋅ q) ⋅ r");
         let unnamed_space = UnnamedGen::new();
-        let equiv = associativity_left_right_and(&expr, &unnamed_space).unwrap();
+        let equiv = associativity_left_right_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p ⋅ (q ⋅ r)");
     }
@@ -469,7 +513,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ⋅ (q ⋅ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = associativity_right_left_and(&expr, &unnamed_space).unwrap();
+        let equiv = associativity_right_left_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "(p ⋅ q) ⋅ r");
     }
@@ -483,7 +527,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ⋅ (q ∨ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = distribution_expand_and(&expr, &unnamed_space).unwrap();
+        let equiv = distribution_expand_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "(p ⋅ q) ∨ (p ⋅ r)");
     }
@@ -497,7 +541,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "(p ⋅ q) ∨ (p ⋅ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = distribution_collapse_or(&expr, &unnamed_space).unwrap();
+        let equiv = distribution_collapse_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p ⋅ (q ∨ r)");
     }
@@ -511,7 +555,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p ∨ (q ⋅ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = distribution_expand_or(&expr, &unnamed_space).unwrap();
+        let equiv = distribution_expand_or(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "(p ∨ q) ⋅ (p ∨ r)");
     }
@@ -525,7 +569,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "(p ∨ q) ⋅ (p ∨ r)");
         let unnamed_space = UnnamedGen::new();
-        let equiv = distribution_collapse_and(&expr, &unnamed_space).unwrap();
+        let equiv = distribution_collapse_and(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p ∨ (q ⋅ r)");
     }
@@ -537,7 +581,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "p");
         let unnamed_space = UnnamedGen::new();
-        let equiv = double_negation_empty(&expr, &unnamed_space).unwrap();
+        let equiv = double_negation_empty(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "∼∼p");
     }
@@ -549,7 +593,7 @@ mod tests {
         println!("{expr}");
         assert_eq!(expr.to_string(), "∼∼p");
         let unnamed_space = UnnamedGen::new();
-        let equiv = double_negation_double(&expr, &unnamed_space).unwrap();
+        let equiv = double_negation_double(&expr, unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p");
     }
