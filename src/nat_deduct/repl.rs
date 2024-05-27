@@ -5,7 +5,10 @@ use crate::{
     extract::extract,
 };
 
-use super::{and, comm_and, comm_or, or, two_and_not, two_not_and, two_not_or, two_or_not};
+use super::{
+    and, comm_and, comm_or, left_assoc_and, left_assoc_or, or, right_assoc_and, right_assoc_or,
+    two_and_not, two_not_and, two_not_or, two_or_not,
+};
 
 macro_rules! replace {
     ( fn $f:ident ( $( $var:ident ),* ) {
@@ -94,6 +97,47 @@ pub fn commutativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc
     }
 }
 
+replace! (
+    fn associativity_left_right_or(p, q, r) {
+        left_assoc_or;
+        right_assoc_or;
+    }
+);
+replace! (
+    fn associativity_right_left_or(p, q, r) {
+        right_assoc_or;
+        left_assoc_or;
+    }
+);
+replace! (
+    fn associativity_left_right_and(p, q, r) {
+        left_assoc_and;
+        right_assoc_and;
+    }
+);
+replace! (
+    fn associativity_right_left_and(p, q, r) {
+        right_assoc_and;
+        left_assoc_and;
+    }
+);
+pub fn associativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        associativity_left_right_or(expr, unnamed_space),
+        associativity_right_left_or(expr, unnamed_space),
+        associativity_left_right_and(expr, unnamed_space),
+        associativity_right_left_and(expr, unnamed_space),
+    ) {
+        (Some(x), _, _, _) | // _
+        (_, Some(x), _, _) | // _
+        (_, _, Some(x), _) | // _
+        (_, _, _, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::nat_deduct::tests::named_var_expr;
@@ -176,5 +220,61 @@ mod tests {
         let equiv = commutativity_and(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "q ⋅ p");
+    }
+
+    #[test]
+    fn test_assoc_left_right_or() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = left_assoc_or(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "(p ∨ q) ∨ r");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = associativity_left_right_or(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "p ∨ (q ∨ r)");
+    }
+
+    #[test]
+    fn test_assoc_right_left_or() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = right_assoc_or(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ∨ (q ∨ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = associativity_right_left_or(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "(p ∨ q) ∨ r");
+    }
+
+    #[test]
+    fn test_assoc_left_right_and() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = left_assoc_and(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "(p ⋅ q) ⋅ r");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = associativity_left_right_and(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "p ⋅ (q ⋅ r)");
+    }
+
+    #[test]
+    fn test_assoc_right_left_and() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = right_assoc_and(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ⋅ (q ⋅ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = associativity_right_left_and(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "(p ⋅ q) ⋅ r");
     }
 }

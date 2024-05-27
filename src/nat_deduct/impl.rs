@@ -10,6 +10,11 @@ use super::{
     or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q, two_p, two_q,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Syllogism<'a> {
+    pub major_prem: &'a Arc<Expr>,
+    pub minor_prem: &'a Arc<Expr>,
+}
 macro_rules! syllogism_implement {
     ( fn $f:ident ( $( $var:ident ),* ) {
         $major_pat:ident;
@@ -33,12 +38,6 @@ macro_rules! syllogism_implement {
             Some(conclusion)
         }
     };
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Syllogism<'a> {
-    pub major_prem: &'a Arc<Expr>,
-    pub minor_prem: &'a Arc<Expr>,
 }
 impl Syllogism<'_> {
     syllogism_implement!(

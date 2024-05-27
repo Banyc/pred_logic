@@ -141,6 +141,30 @@ fn comm_and(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
 }
 
 /// ```math
+/// p ∨ (q ∨ r)
+/// ```
+fn right_assoc_or(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    or(p, or(q, r))
+}
+/// ```math
+/// (p ∨ q) ∨ r
+/// ```
+fn left_assoc_or(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    or(or(p, q), r)
+}
+/// ```math
+/// p ⋅ (q ⋅ r)
+/// ```
+fn right_assoc_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    and(p, and(q, r))
+}
+/// ```math
+/// (p ⋅ q) ⋅ r
+/// ```
+fn left_assoc_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    and(and(p, q), r)
+}
+/// ```math
 /// p ⊃ q
 /// ```
 fn three_if_p_q(p: Arc<Expr>, q: Arc<Expr>, _r: Arc<Expr>) -> Arc<Expr> {
