@@ -21,8 +21,7 @@ macro_rules! syllogism_implement {
         $minor_pat:ident;
         $conclusion:ident;
     } ) => {
-        pub fn $f(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-            let mut unnamed_space = unnamed_space.clone();
+        pub fn $f(&self, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
             let major_pat = $major_pat(
                 $( Arc::new(Expr::Var($var.clone())), )*
@@ -83,34 +82,30 @@ impl Syllogism<'_> {
         }
     );
 
-    pub fn conjunction(&self) -> Option<Arc<Expr>> {
-        let conclusion = and(Arc::clone(self.major_prem), Arc::clone(self.minor_prem));
-        Some(conclusion)
+    pub fn conjunction(&self) -> Arc<Expr> {
+        and(Arc::clone(self.major_prem), Arc::clone(self.minor_prem))
     }
 
-    pub fn any(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-        if let Some(x) = self.conjunction() {
+    pub fn any(&self, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
+        if let Some(x) = self.modus_ponens(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.modus_ponens(unnamed_space) {
+        if let Some(x) = self.modus_tollens(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.modus_tollens(unnamed_space) {
+        if let Some(x) = self.pure_hypothetical_syllogism(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.pure_hypothetical_syllogism(unnamed_space) {
+        if let Some(x) = self.disjunctive_syllogism(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.disjunctive_syllogism(unnamed_space) {
+        if let Some(x) = self.conjunctive_dilemma(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.conjunctive_dilemma(unnamed_space) {
+        if let Some(x) = self.disjunctive_dilemma(unnamed_space.clone()) {
             return Some(x);
         }
-        if let Some(x) = self.disjunctive_dilemma(unnamed_space) {
-            return Some(x);
-        }
-        None
+        Some(self.conjunction())
     }
 
     fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<VarExprMap> {
@@ -120,8 +115,7 @@ impl Syllogism<'_> {
     }
 }
 
-pub fn simplification(prem: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
-    let mut unnamed_space = unnamed_space.clone();
+pub fn simplification(prem: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     let p = Var::Unnamed(unnamed_space.gen());
     let q = Var::Unnamed(unnamed_space.gen());
     let p_expr = Arc::new(Expr::Var(p.clone()));
@@ -158,7 +152,7 @@ mod tests {
             minor_prem: &minor_prem,
         };
         let unnamed_space = UnnamedGen::new();
-        let conclusion = syllogism.modus_ponens(&unnamed_space).unwrap();
+        let conclusion = syllogism.modus_ponens(unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "q");
     }
@@ -178,7 +172,7 @@ mod tests {
             minor_prem: &minor_prem,
         };
         let unnamed_space = UnnamedGen::new();
-        let conclusion = syllogism.modus_tollens(&unnamed_space).unwrap();
+        let conclusion = syllogism.modus_tollens(unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "∼p");
     }
@@ -200,7 +194,7 @@ mod tests {
         };
         let unnamed_space = UnnamedGen::new();
         let conclusion = syllogism
-            .pure_hypothetical_syllogism(&unnamed_space)
+            .pure_hypothetical_syllogism(unnamed_space)
             .unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "p ⊃ r");
@@ -221,7 +215,7 @@ mod tests {
             minor_prem: &minor_prem,
         };
         let unnamed_space = UnnamedGen::new();
-        let conclusion = syllogism.disjunctive_syllogism(&unnamed_space).unwrap();
+        let conclusion = syllogism.disjunctive_syllogism(unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "q");
     }
@@ -243,7 +237,7 @@ mod tests {
             minor_prem: &minor_prem,
         };
         let unnamed_space = UnnamedGen::new();
-        let conclusion = syllogism.conjunctive_dilemma(&unnamed_space).unwrap();
+        let conclusion = syllogism.conjunctive_dilemma(unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "q ∨ s");
     }
@@ -265,7 +259,7 @@ mod tests {
             minor_prem: &minor_prem,
         };
         let unnamed_space = UnnamedGen::new();
-        let conclusion = syllogism.disjunctive_dilemma(&unnamed_space).unwrap();
+        let conclusion = syllogism.disjunctive_dilemma(unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "∼p ∨ ∼r");
     }
@@ -280,7 +274,7 @@ mod tests {
             major_prem: &p,
             minor_prem: &q,
         };
-        let conclusion = syllogism.conjunction().unwrap();
+        let conclusion = syllogism.conjunction();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "p ⋅ q");
     }
@@ -293,7 +287,7 @@ mod tests {
         println!("{prem}");
         assert_eq!(prem.to_string(), "p ⋅ q");
         let unnamed_space = UnnamedGen::new();
-        let conclusion = simplification(&prem, &unnamed_space).unwrap();
+        let conclusion = simplification(&prem, unnamed_space).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "p");
         assert_eq!(conclusion, p);
