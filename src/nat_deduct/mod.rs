@@ -14,6 +14,18 @@ fn not(p: Arc<Expr>) -> Arc<Expr> {
         expr: p,
     }))
 }
+/// ```math
+/// ∼∼p
+/// ```
+fn not_not(p: Arc<Expr>) -> Arc<Expr> {
+    not(not(p))
+}
+/// ```math
+/// p
+/// ```
+fn one_p(p: Arc<Expr>) -> Arc<Expr> {
+    p
+}
 
 /// ```math
 /// p ⊃ q

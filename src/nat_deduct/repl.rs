@@ -6,9 +6,9 @@ use crate::{
 };
 
 use super::{
-    and, and_or, comm_and, comm_or, left_assoc_and, left_assoc_or, or, or_and, right_assoc_and,
-    right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and, two_and_not, two_not_and,
-    two_not_or, two_or_not,
+    and, and_or, comm_and, comm_or, left_assoc_and, left_assoc_or, not_not, one_p, or, or_and,
+    right_assoc_and, right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and,
+    two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
 macro_rules! replace {
@@ -174,6 +174,32 @@ pub fn distribution(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<
         (_, Some(x), _, _) | // _
         (_, _, Some(x), _) | // _
         (_, _, _, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn double_negation_empty(p) {
+        one_p;
+        not_not;
+    }
+);
+replace! (
+    fn double_negation_double(p) {
+        not_not;
+        one_p;
+    }
+);
+pub fn double_negation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        // Try to cancel out the double nots first
+        double_negation_double(expr, unnamed_space),
+        double_negation_empty(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
             Some(x)
         }
         _ => None,
@@ -374,5 +400,29 @@ mod tests {
         let equiv = distribution_collapse_and(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "p ∨ (q ⋅ r)");
+    }
+
+    #[test]
+    fn test_dn_empty() {
+        let p = named_var_expr("p");
+        let expr = p.clone();
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = double_negation_empty(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "∼∼p");
+    }
+
+    #[test]
+    fn test_dn_double() {
+        let p = named_var_expr("p");
+        let expr = not_not(Arc::clone(&p));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "∼∼p");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = double_negation_double(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "p");
     }
 }
