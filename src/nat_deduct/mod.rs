@@ -26,6 +26,18 @@ fn not_not(p: Arc<Expr>) -> Arc<Expr> {
 fn one_p(p: Arc<Expr>) -> Arc<Expr> {
     p
 }
+/// ```math
+/// p ⋅ p
+/// ```
+fn one_and(p: Arc<Expr>) -> Arc<Expr> {
+    and(Arc::clone(&p), p)
+}
+/// ```math
+/// p ∨ p
+/// ```
+fn one_or(p: Arc<Expr>) -> Arc<Expr> {
+    or(Arc::clone(&p), p)
+}
 
 /// ```math
 /// p ⊃ q

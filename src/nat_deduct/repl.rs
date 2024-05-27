@@ -7,9 +7,9 @@ use crate::{
 
 use super::{
     and, and_or, both_p_q_then_r, comm_and, comm_or, if_not_q_not_p, if_p_q, if_p_then_if_q_r,
-    left_assoc_and, left_assoc_or, not_not, not_p_or, one_p, or, or_and, right_assoc_and,
-    right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and, two_and_not, two_not_and,
-    two_not_or, two_or_not,
+    left_assoc_and, left_assoc_or, not_not, not_p_or, one_and, one_or, one_p, or, or_and,
+    right_assoc_and, right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and,
+    two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
 macro_rules! replace {
@@ -273,6 +273,58 @@ pub fn exportation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<E
     match (
         exportation_and(expr, unnamed_space),
         exportation_if(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn tautology_empty_and(p) {
+        one_p;
+        one_and;
+    }
+);
+replace! (
+    fn tautology_and_empty(p) {
+        one_and;
+        one_p;
+    }
+);
+pub fn tautology_and(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        // Try to cancel out the redundancy first
+        tautology_and_empty(expr, unnamed_space),
+        tautology_empty_and(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn tautology_empty_or(p) {
+        one_p;
+        one_or;
+    }
+);
+replace! (
+    fn tautology_or_empty(p) {
+        one_or;
+        one_p;
+    }
+);
+pub fn tautology_or(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        // Try to cancel out the redundancy first
+        tautology_or_empty(expr, unnamed_space),
+        tautology_empty_or(expr, unnamed_space),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
