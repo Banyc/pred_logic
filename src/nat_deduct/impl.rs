@@ -88,6 +88,31 @@ impl Syllogism<'_> {
         Some(conclusion)
     }
 
+    pub fn any(&self, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+        if let Some(x) = self.conjunction() {
+            return Some(x);
+        }
+        if let Some(x) = self.modus_ponens(unnamed_space) {
+            return Some(x);
+        }
+        if let Some(x) = self.modus_tollens(unnamed_space) {
+            return Some(x);
+        }
+        if let Some(x) = self.pure_hypothetical_syllogism(unnamed_space) {
+            return Some(x);
+        }
+        if let Some(x) = self.disjunctive_syllogism(unnamed_space) {
+            return Some(x);
+        }
+        if let Some(x) = self.conjunctive_dilemma(unnamed_space) {
+            return Some(x);
+        }
+        if let Some(x) = self.disjunctive_dilemma(unnamed_space) {
+            return Some(x);
+        }
+        None
+    }
+
     fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<VarExprMap> {
         let captured_1 = extract(self.major_prem, major_pattern)?;
         let captured_2 = extract(self.minor_prem, minor_pattern)?;
