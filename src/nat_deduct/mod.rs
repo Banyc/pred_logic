@@ -294,6 +294,10 @@ mod tests {
     use crate::expr::{Expr, Named, Var};
 
     pub fn named_var_expr(name: &str) -> Arc<Expr> {
-        Arc::new(Expr::Var(Var::Named(Named { name: name.into() })))
+        var_expr(Var::Named(Named { name: name.into() }))
+    }
+
+    pub fn var_expr(var: Var) -> Arc<Expr> {
+        Arc::new(Expr::Var(var))
     }
 }

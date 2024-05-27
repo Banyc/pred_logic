@@ -33,9 +33,6 @@ impl Proof {
     pub fn conclusion(&self) -> &Arc<Expr> {
         &self.conclusion
     }
-    pub fn unnamed_space(&self) -> &UnnamedGen {
-        &self.unnamed_space
-    }
 
     pub fn syllogism(&mut self, major_prem: usize, minor_prem: usize) {
         let major_prem = &self.premises[major_prem];
@@ -64,9 +61,13 @@ impl Proof {
         self.premises.push(expr);
     }
 
-    pub fn replace(&mut self, prem: usize, pat: &Arc<Expr>, var: Var, op: ReplacementOp) {
+    pub fn replace(&mut self, prem: usize, pat: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
+        let mut unnamed_space = self.unnamed_space.clone();
+        let var = Var::Unnamed(unnamed_space.gen());
+        let pat = pat(var.clone());
+
         let prem = &self.premises[prem];
-        let Some(captured) = extract(prem, pat) else {
+        let Some(captured) = extract(prem, &pat) else {
             return;
         };
         let Some(expr) = captured.get(&var) else {
@@ -76,7 +77,7 @@ impl Proof {
             return;
         };
         let map = HashMap::from_iter([(var, equiv)]);
-        let new = extract::replace(pat, &map);
+        let new = extract::replace(&pat, &map);
         self.premises.push(new);
     }
 
@@ -94,7 +95,10 @@ pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::nat_deduct::{if_p_q, tests::named_var_expr};
+    use crate::nat_deduct::{
+        if_p_q,
+        tests::{named_var_expr, var_expr},
+    };
 
     use super::*;
 
@@ -144,55 +148,19 @@ mod tests {
         proof.syllogism(0, 2);
         print_premises(proof.premises());
         println!();
-        {
-            let mut unnamed_space = proof.unnamed_space().clone();
-            let x = Var::Unnamed(unnamed_space.gen());
-            proof.replace(
-                3,
-                &Arc::new(Expr::Var(x.clone())),
-                x,
-                ReplacementOp::DeMorgen,
-            );
-        }
+        proof.replace(3, var_expr, ReplacementOp::DeMorgen);
         print_premises(proof.premises());
         println!();
-        {
-            let mut unnamed_space = proof.unnamed_space().clone();
-            let x = Var::Unnamed(unnamed_space.gen());
-            proof.replace(
-                1,
-                &Arc::new(Expr::Var(x.clone())),
-                x,
-                ReplacementOp::Commutativity,
-            );
-        }
+        proof.replace(1, var_expr, ReplacementOp::Commutativity);
         print_premises(proof.premises());
         println!();
         proof.simplification(5);
         print_premises(proof.premises());
         println!();
-        {
-            let mut unnamed_space = proof.unnamed_space().clone();
-            let x = Var::Unnamed(unnamed_space.gen());
-            proof.replace(
-                4,
-                &Arc::new(Expr::Var(x.clone())),
-                x,
-                ReplacementOp::Commutativity,
-            );
-        }
+        proof.replace(4, var_expr, ReplacementOp::Commutativity);
         print_premises(proof.premises());
         println!();
-        {
-            let mut unnamed_space = proof.unnamed_space().clone();
-            let x = Var::Unnamed(unnamed_space.gen());
-            proof.replace(
-                6,
-                &Arc::new(Expr::Var(x.clone())),
-                x,
-                ReplacementOp::DoubleNegation,
-            );
-        }
+        proof.replace(6, var_expr, ReplacementOp::DoubleNegation);
         print_premises(proof.premises());
         println!();
         proof.syllogism(7, 8);
