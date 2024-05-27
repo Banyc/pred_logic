@@ -92,7 +92,7 @@ impl core::fmt::Display for Named {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Unnamed {
-    pub id: usize,
+    id: usize,
 }
 impl core::fmt::Display for Unnamed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
