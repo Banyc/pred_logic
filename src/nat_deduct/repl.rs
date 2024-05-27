@@ -6,9 +6,9 @@ use crate::{
 };
 
 use super::{
-    and, and_or, comm_and, comm_or, left_assoc_and, left_assoc_or, not_not, one_p, or, or_and,
-    right_assoc_and, right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and,
-    two_and_not, two_not_and, two_not_or, two_or_not,
+    and, and_or, comm_and, comm_or, if_not_q_not_p, if_p_q, left_assoc_and, left_assoc_or, not_not,
+    one_p, or, or_and, or_not_p, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
+    three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
 macro_rules! replace {
@@ -197,6 +197,56 @@ pub fn double_negation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<A
         // Try to cancel out the double nots first
         double_negation_double(expr, unnamed_space),
         double_negation_empty(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn transposition_empty(p, q) {
+        if_p_q;
+        if_not_q_not_p;
+    }
+);
+replace! (
+    fn transposition_not(p, q) {
+        if_not_q_not_p;
+        if_p_q;
+    }
+);
+pub fn transposition(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        transposition_empty(expr, unnamed_space),
+        transposition_not(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn material_implication_if(p, q) {
+        if_p_q;
+        or_not_p;
+    }
+);
+replace! (
+    fn material_implication_or(p, q) {
+        or_not_p;
+        if_p_q;
+    }
+);
+pub fn material_implication(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        material_implication_if(expr, unnamed_space),
+        material_implication_or(expr, unnamed_space),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {

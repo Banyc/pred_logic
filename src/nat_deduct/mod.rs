@@ -38,6 +38,18 @@ fn if_p_q(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
     }))
 }
 /// ```math
+/// ∼q ⊃ ∼p
+/// ```
+fn if_not_q_not_p(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
+    if_p_q(not(q), not(p))
+}
+/// ```math
+/// ∼p ∨ q
+/// ```
+fn or_not_p(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
+    or(not(p), q)
+}
+/// ```math
 /// p
 /// ```
 fn two_p(p: Arc<Expr>, _q: Arc<Expr>) -> Arc<Expr> {
