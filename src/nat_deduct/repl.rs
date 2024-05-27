@@ -6,8 +6,9 @@ use crate::{
 };
 
 use super::{
-    and, comm_and, comm_or, left_assoc_and, left_assoc_or, or, right_assoc_and, right_assoc_or,
-    two_and_not, two_not_and, two_not_or, two_or_not,
+    and, and_or, comm_and, comm_or, left_assoc_and, left_assoc_or, or, or_and, right_assoc_and,
+    right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and, two_and_not, two_not_and,
+    two_not_or, two_or_not,
 };
 
 macro_rules! replace {
@@ -127,6 +128,47 @@ pub fn associativity(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc
         associativity_right_left_or(expr, unnamed_space),
         associativity_left_right_and(expr, unnamed_space),
         associativity_right_left_and(expr, unnamed_space),
+    ) {
+        (Some(x), _, _, _) | // _
+        (_, Some(x), _, _) | // _
+        (_, _, Some(x), _) | // _
+        (_, _, _, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn distribution_expand_and(p, q, r) {
+        and_or;
+        three_expanded_as_or_and;
+    }
+);
+replace! (
+    fn distribution_collapse_or(p, q, r) {
+        three_expanded_as_or_and;
+        and_or;
+    }
+);
+replace! (
+    fn distribution_expand_or(p, q, r) {
+        or_and;
+        three_expanded_as_and_or;
+    }
+);
+replace! (
+    fn distribution_collapse_and(p, q, r) {
+        three_expanded_as_and_or;
+        or_and;
+    }
+);
+pub fn distribution(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        distribution_expand_and(expr, unnamed_space),
+        distribution_collapse_or(expr, unnamed_space),
+        distribution_expand_or(expr, unnamed_space),
+        distribution_collapse_and(expr, unnamed_space),
     ) {
         (Some(x), _, _, _) | // _
         (_, Some(x), _, _) | // _
@@ -276,5 +318,61 @@ mod tests {
         let equiv = associativity_right_left_and(&expr, &unnamed_space).unwrap();
         println!("{equiv}");
         assert_eq!(equiv.to_string(), "(p ⋅ q) ⋅ r");
+    }
+
+    #[test]
+    fn test_dist_expand_and() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = and_or(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ⋅ (q ∨ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = distribution_expand_and(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "(p ⋅ q) ∨ (p ⋅ r)");
+    }
+
+    #[test]
+    fn test_dist_collapse_or() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = three_expanded_as_or_and(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "(p ⋅ q) ∨ (p ⋅ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = distribution_collapse_or(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "p ⋅ (q ∨ r)");
+    }
+
+    #[test]
+    fn test_dist_expand_or() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = or_and(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "p ∨ (q ⋅ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = distribution_expand_or(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "(p ∨ q) ⋅ (p ∨ r)");
+    }
+
+    #[test]
+    fn test_dist_collapse_and() {
+        let p = named_var_expr("p");
+        let q = named_var_expr("q");
+        let r = named_var_expr("r");
+        let expr = three_expanded_as_and_or(Arc::clone(&p), Arc::clone(&q), Arc::clone(&r));
+        println!("{expr}");
+        assert_eq!(expr.to_string(), "(p ∨ q) ⋅ (p ∨ r)");
+        let unnamed_space = UnnamedGen::new();
+        let equiv = distribution_collapse_and(&expr, &unnamed_space).unwrap();
+        println!("{equiv}");
+        assert_eq!(equiv.to_string(), "p ∨ (q ⋅ r)");
     }
 }

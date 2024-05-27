@@ -165,6 +165,18 @@ fn left_assoc_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
     and(and(p, q), r)
 }
 /// ```math
+/// p ⋅ (q ∨ r)
+/// ```
+fn and_or(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    and(p, or(q, r))
+}
+/// ```math
+/// p ∨ (q ⋅ r)
+/// ```
+fn or_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    or(p, and(q, r))
+}
+/// ```math
 /// p ⊃ q
 /// ```
 fn three_if_p_q(p: Arc<Expr>, q: Arc<Expr>, _r: Arc<Expr>) -> Arc<Expr> {
@@ -182,16 +194,24 @@ fn three_if_q_r(_p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
 fn three_if_p_r(p: Arc<Expr>, _q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
     if_p_q(p, r)
 }
+/// ```math
+/// (p ⋅ q) ∨ (p ⋅ r)
+/// ```
+fn three_expanded_as_or_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    or(and(Arc::clone(&p), q), and(p, r))
+}
+/// ```math
+/// (p ∨ q) ⋅ (p ∨ r)
+/// ```
+fn three_expanded_as_and_or(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    and(or(Arc::clone(&p), q), or(p, r))
+}
 
 /// ```math
 /// (p ⊃ q) ⋅ (r ⊃ s)
 /// ```
 fn four_and_if(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>, s: Arc<Expr>) -> Arc<Expr> {
-    Arc::new(Expr::BinOp(BinOpExpr {
-        op: BinOp::And,
-        left: if_p_q(p, q),
-        right: if_p_q(r, s),
-    }))
+    and(if_p_q(p, q), if_p_q(r, s))
 }
 /// ```math
 /// p ∨ r
