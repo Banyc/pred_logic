@@ -46,7 +46,7 @@ fn if_not_q_not_p(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
 /// ```math
 /// ∼p ∨ q
 /// ```
-fn or_not_p(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
+fn not_p_or(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
     or(not(p), q)
 }
 /// ```math
@@ -229,6 +229,18 @@ fn three_expanded_as_or_and(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Exp
 /// ```
 fn three_expanded_as_and_or(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
     and(or(Arc::clone(&p), q), or(p, r))
+}
+/// ```math
+/// (p ⋅ q) ⊃ r
+/// ```
+fn both_p_q_then_r(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    if_p_q(and(p, q), r)
+}
+/// ```math
+/// p ⊃ (q ⊃ r)
+/// ```
+fn if_p_then_if_q_r(p: Arc<Expr>, q: Arc<Expr>, r: Arc<Expr>) -> Arc<Expr> {
+    if_p_q(p, if_p_q(q, r))
 }
 
 /// ```math

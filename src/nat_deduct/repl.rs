@@ -6,9 +6,10 @@ use crate::{
 };
 
 use super::{
-    and, and_or, comm_and, comm_or, if_not_q_not_p, if_p_q, left_assoc_and, left_assoc_or, not_not,
-    one_p, or, or_and, or_not_p, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
-    three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
+    and, and_or, both_p_q_then_r, comm_and, comm_or, if_not_q_not_p, if_p_q, if_p_then_if_q_r,
+    left_assoc_and, left_assoc_or, not_not, not_p_or, one_p, or, or_and, right_assoc_and,
+    right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and, two_and_not, two_not_and,
+    two_not_or, two_or_not,
 };
 
 macro_rules! replace {
@@ -234,12 +235,12 @@ pub fn transposition(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc
 replace! (
     fn material_implication_if(p, q) {
         if_p_q;
-        or_not_p;
+        not_p_or;
     }
 );
 replace! (
     fn material_implication_or(p, q) {
-        or_not_p;
+        not_p_or;
         if_p_q;
     }
 );
@@ -247,6 +248,31 @@ pub fn material_implication(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Opt
     match (
         material_implication_if(expr, unnamed_space),
         material_implication_or(expr, unnamed_space),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+replace! (
+    fn exportation_and(p, q, r) {
+        both_p_q_then_r;
+        if_p_then_if_q_r;
+    }
+);
+replace! (
+    fn exportation_if(p, q, r) {
+        if_p_then_if_q_r;
+        both_p_q_then_r;
+    }
+);
+pub fn exportation(expr: &Arc<Expr>, unnamed_space: &UnnamedGen) -> Option<Arc<Expr>> {
+    match (
+        exportation_and(expr, unnamed_space),
+        exportation_if(expr, unnamed_space),
     ) {
         (Some(x), _) | // _
         (_, Some(x)) => {
