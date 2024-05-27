@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::expr::{BinOp, BinOpExpr, Expr, UnOp, UnOpExpr};
 
 pub mod r#impl;
+pub mod proof;
 pub mod repl;
 
 /// ```math

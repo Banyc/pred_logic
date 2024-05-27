@@ -15,7 +15,7 @@ pub struct Syllogism<'a> {
     pub major_prem: &'a Arc<Expr>,
     pub minor_prem: &'a Arc<Expr>,
 }
-macro_rules! syllogism_implement {
+macro_rules! syllogism_implication {
     ( fn $f:ident ( $( $var:ident ),* ) {
         $major_pat:ident;
         $minor_pat:ident;
@@ -39,42 +39,42 @@ macro_rules! syllogism_implement {
     };
 }
 impl Syllogism<'_> {
-    syllogism_implement!(
+    syllogism_implication!(
         fn modus_ponens(p, q) {
             if_p_q;
             two_p;
             two_q;
         }
     );
-    syllogism_implement!(
+    syllogism_implication!(
         fn modus_tollens(p, q) {
             if_p_q;
             two_not_q;
             two_not_p;
         }
     );
-    syllogism_implement!(
+    syllogism_implication!(
         fn pure_hypothetical_syllogism(p, q, r) {
             three_if_p_q;
             three_if_q_r;
             three_if_p_r;
         }
     );
-    syllogism_implement!(
+    syllogism_implication!(
         fn disjunctive_syllogism(p, q) {
             or;
             two_not_p;
             two_q;
         }
     );
-    syllogism_implement!(
+    syllogism_implication!(
         fn conjunctive_dilemma(p, q, r, s) {
             four_and_if;
             four_p_or_r;
             four_q_or_s;
         }
     );
-    syllogism_implement!(
+    syllogism_implication!(
         fn disjunctive_dilemma(p, q, r, s) {
             four_and_if;
             four_not_q_or_not_s;
@@ -86,26 +86,26 @@ impl Syllogism<'_> {
         and(Arc::clone(self.major_prem), Arc::clone(self.minor_prem))
     }
 
-    pub fn any(&self, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
+    pub fn any(&self, unnamed_space: UnnamedGen) -> Arc<Expr> {
         if let Some(x) = self.modus_ponens(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
         if let Some(x) = self.modus_tollens(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
         if let Some(x) = self.pure_hypothetical_syllogism(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
         if let Some(x) = self.disjunctive_syllogism(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
         if let Some(x) = self.conjunctive_dilemma(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
         if let Some(x) = self.disjunctive_dilemma(unnamed_space.clone()) {
-            return Some(x);
+            return x;
         }
-        Some(self.conjunction())
+        self.conjunction()
     }
 
     fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<VarExprMap> {
