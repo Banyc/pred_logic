@@ -15,18 +15,21 @@ use super::{
 pub enum Proof {
     Root(RootProof),
     Cond(CondProof),
+    Indirect(IndirectProof),
 }
 impl Proof {
     pub fn direct_mut(&mut self) -> &mut DirectProof {
         match self {
             Proof::Root(x) => x.direct_mut(),
             Proof::Cond(x) => x.direct_mut(),
+            Proof::Indirect(x) => x.direct_mut(),
         }
     }
     pub fn direct(&self) -> &DirectProof {
         match self {
             Proof::Root(x) => x.direct(),
             Proof::Cond(x) => x.direct(),
+            Proof::Indirect(x) => x.direct(),
         }
     }
     pub fn root(&self) -> Option<&RootProof> {
@@ -173,6 +176,46 @@ impl CondProof {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct IndirectProof {
+    prev_proof: Box<Proof>,
+    direct: DirectProof,
+    assume: Arc<Expr>,
+}
+impl IndirectProof {
+    pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
+        let mut direct = prev_proof.direct().clone();
+        direct.push_premise(Arc::clone(&assume), None);
+        Self {
+            prev_proof,
+            direct,
+            assume,
+        }
+    }
+
+    pub fn direct(&self) -> &DirectProof {
+        &self.direct
+    }
+    pub fn direct_mut(&mut self) -> &mut DirectProof {
+        &mut self.direct
+    }
+
+    pub fn conclude(mut self) -> Result<Proof, Self> {
+        let last = self.direct().premises().last().unwrap();
+        let unnamed_space = self.direct.unnamed_space().clone();
+        if !contradiction(last, unnamed_space) {
+            return Err(self);
+        }
+        self.prev_proof
+            .direct_mut()
+            .push_premise(not(self.assume), None);
+        Ok(*self.prev_proof)
+    }
+}
+
+/// ```math
+/// p ⋅ ∼p
+/// ```
 pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
     let p = Var::Unnamed(unnamed_space.gen());
     let p_expr = Arc::new(Expr::Var(p.clone()));
@@ -297,6 +340,53 @@ mod tests {
         print_premises(proof.direct().premises());
         println!();
         let proof = proof.conclude().root().unwrap().clone();
+        print_premises(proof.direct().premises());
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_indirect_proof() {
+        let a = named_var_expr("A");
+        let b = named_var_expr("B");
+        let c = named_var_expr("C");
+        let d = named_var_expr("D");
+        let premises = [
+            if_p_q(or(a.clone(), b.clone()), and(c.clone(), d.clone())),
+            if_p_q(c.clone(), not(d.clone())),
+        ]
+        .into();
+        let conclusion = not(a.clone());
+        let proof = RootProof::new(premises, conclusion);
+        print_premises(proof.direct().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        let mut proof = IndirectProof::new(Box::new(Proof::Root(proof)), a.clone());
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().addition(2, b.clone());
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().syllogism(0, 3);
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().simplification(4);
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().syllogism(1, 5);
+        print_premises(proof.direct().premises());
+        println!();
+        proof
+            .direct_mut()
+            .replace(4, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().simplification(7);
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().syllogism(8, 6);
+        print_premises(proof.direct().premises());
+        println!();
+        let proof = proof.conclude().unwrap().root().unwrap().clone();
         print_premises(proof.direct().premises());
         assert!(proof.conclude());
     }
