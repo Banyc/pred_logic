@@ -18,18 +18,18 @@ pub enum Proof {
     Indirect(IndirectProof),
 }
 impl Proof {
-    pub fn direct_mut(&mut self) -> &mut DirectProof {
+    pub fn deduction_mut(&mut self) -> &mut Deduction {
         match self {
-            Proof::Root(x) => x.direct_mut(),
-            Proof::Cond(x) => x.direct_mut(),
-            Proof::Indirect(x) => x.direct_mut(),
+            Proof::Root(x) => x.deduction_mut(),
+            Proof::Cond(x) => x.deduction_mut(),
+            Proof::Indirect(x) => x.deduction_mut(),
         }
     }
-    pub fn direct(&self) -> &DirectProof {
+    pub fn deduction(&self) -> &Deduction {
         match self {
-            Proof::Root(x) => x.direct(),
-            Proof::Cond(x) => x.direct(),
-            Proof::Indirect(x) => x.direct(),
+            Proof::Root(x) => x.deduction(),
+            Proof::Cond(x) => x.deduction(),
+            Proof::Indirect(x) => x.deduction(),
         }
     }
     pub fn root(&self) -> Option<&RootProof> {
@@ -54,37 +54,40 @@ impl Proof {
 
 #[derive(Debug, Clone)]
 pub struct RootProof {
-    direct: DirectProof,
+    deduction: Deduction,
     conclusion: Arc<Expr>,
 }
 impl RootProof {
     pub fn new(premises: Vec<Arc<Expr>>, conclusion: Arc<Expr>) -> Self {
         let unnamed_space = UnnamedGen::new();
-        let direct = DirectProof::new(premises, unnamed_space);
-        Self { direct, conclusion }
+        let deduction = Deduction::new(premises, unnamed_space);
+        Self {
+            deduction,
+            conclusion,
+        }
     }
 
-    pub fn direct(&self) -> &DirectProof {
-        &self.direct
+    pub fn deduction(&self) -> &Deduction {
+        &self.deduction
     }
-    pub fn direct_mut(&mut self) -> &mut DirectProof {
-        &mut self.direct
+    pub fn deduction_mut(&mut self) -> &mut Deduction {
+        &mut self.deduction
     }
     pub fn conclusion(&self) -> &Arc<Expr> {
         &self.conclusion
     }
 
     pub fn conclude(&self) -> bool {
-        self.direct().premises.contains(&self.conclusion)
+        self.deduction().premises.contains(&self.conclusion)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct DirectProof {
+pub struct Deduction {
     unnamed_space: UnnamedGen,
     premises: Vec<Arc<Expr>>,
 }
-impl DirectProof {
+impl Deduction {
     pub fn new(premises: Vec<Arc<Expr>>, unnamed_space: UnnamedGen) -> Self {
         Self {
             unnamed_space,
@@ -156,33 +159,33 @@ impl DirectProof {
 #[derive(Debug, Clone)]
 pub struct CondProof {
     prev_proof: Box<Proof>,
-    direct: DirectProof,
+    deduction: Deduction,
     assume: Arc<Expr>,
 }
 impl CondProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
-        let mut direct = prev_proof.direct().clone();
-        direct.push_premise(Arc::clone(&assume), None);
+        let mut deduction = prev_proof.deduction().clone();
+        deduction.push_premise(Arc::clone(&assume), None);
         Self {
             prev_proof,
-            direct,
+            deduction,
             assume,
         }
     }
 
-    pub fn direct(&self) -> &DirectProof {
-        &self.direct
+    pub fn deduction(&self) -> &Deduction {
+        &self.deduction
     }
-    pub fn direct_mut(&mut self) -> &mut DirectProof {
-        &mut self.direct
+    pub fn deduction_mut(&mut self) -> &mut Deduction {
+        &mut self.deduction
     }
 
     pub fn conclude(mut self) -> Proof {
-        let last = self.direct().premises().last().unwrap();
+        let last = self.deduction().premises().last().unwrap();
         let cond = if_p_q(Arc::clone(&self.assume), Arc::clone(last));
-        let unnamed_space = self.direct.unnamed_space().clone();
+        let unnamed_space = self.deduction.unnamed_space().clone();
         self.prev_proof
-            .direct_mut()
+            .deduction_mut()
             .push_premise(cond, Some(unnamed_space));
         *self.prev_proof
     }
@@ -191,35 +194,35 @@ impl CondProof {
 #[derive(Debug, Clone)]
 pub struct IndirectProof {
     prev_proof: Box<Proof>,
-    direct: DirectProof,
+    deduction: Deduction,
     assume: Arc<Expr>,
 }
 impl IndirectProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
-        let mut direct = prev_proof.direct().clone();
-        direct.push_premise(Arc::clone(&assume), None);
+        let mut deduction = prev_proof.deduction().clone();
+        deduction.push_premise(Arc::clone(&assume), None);
         Self {
             prev_proof,
-            direct,
+            deduction,
             assume,
         }
     }
 
-    pub fn direct(&self) -> &DirectProof {
-        &self.direct
+    pub fn deduction(&self) -> &Deduction {
+        &self.deduction
     }
-    pub fn direct_mut(&mut self) -> &mut DirectProof {
-        &mut self.direct
+    pub fn deduction_mut(&mut self) -> &mut Deduction {
+        &mut self.deduction
     }
 
     pub fn conclude(mut self) -> Result<Proof, Self> {
-        let last = self.direct().premises().last().unwrap();
-        let unnamed_space = self.direct.unnamed_space().clone();
+        let last = self.deduction().premises().last().unwrap();
+        let unnamed_space = self.deduction.unnamed_space().clone();
         if !contradiction(last, unnamed_space) {
             return Err(self);
         }
         self.prev_proof
-            .direct_mut()
+            .deduction_mut()
             .push_premise(not(self.assume), None);
         Ok(*self.prev_proof)
     }
@@ -257,14 +260,14 @@ mod tests {
         .into();
         let conclusion = not(c.clone());
         let mut proof = RootProof::new(premises, conclusion);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!("// {}", proof.conclusion());
         println!();
-        proof.direct_mut().syllogism(0, 2);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(0, 2);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(1, 3);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(1, 3);
+        print_premises(proof.deduction().premises());
         println!();
         assert!(proof.conclude());
     }
@@ -281,40 +284,40 @@ mod tests {
         .into();
         let conclusion = not(b.clone());
         let mut proof = RootProof::new(premises, conclusion);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!("// {}", proof.conclusion());
         println!();
-        proof.direct_mut().simplification(1);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().simplification(1);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(0, 2);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(0, 2);
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(3, var_expr, ReplacementOp::DeMorgen);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(1, var_expr, ReplacementOp::Commutativity);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().simplification(5);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().simplification(5);
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(4, var_expr, ReplacementOp::Commutativity);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(6, var_expr, ReplacementOp::DoubleNegation);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(7, 8);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(7, 8);
+        print_premises(proof.deduction().premises());
         println!();
         assert!(proof.conclude());
     }
@@ -333,26 +336,26 @@ mod tests {
         .into();
         let conclusion = if_p_q(a.clone(), e.clone());
         let proof = RootProof::new(premises, conclusion);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!("// {}", proof.conclusion());
         println!();
         let mut proof = CondProof::new(Box::new(Proof::Root(proof)), a.clone());
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(0, 2);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(0, 2);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().simplification(3);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().simplification(3);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().addition(4, d.clone());
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().addition(4, d.clone());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(1, 5);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(1, 5);
+        print_premises(proof.deduction().premises());
         println!();
         let proof = proof.conclude().root().unwrap().clone();
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         assert!(proof.conclude());
     }
 
@@ -369,37 +372,37 @@ mod tests {
         .into();
         let conclusion = not(a.clone());
         let proof = RootProof::new(premises, conclusion);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!("// {}", proof.conclusion());
         println!();
         let mut proof = IndirectProof::new(Box::new(Proof::Root(proof)), a.clone());
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().addition(2, b.clone());
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().addition(2, b.clone());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(0, 3);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(0, 3);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().simplification(4);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().simplification(4);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(1, 5);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(1, 5);
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(4, var_expr, ReplacementOp::Commutativity);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().simplification(7);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().simplification(7);
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().syllogism(8, 6);
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().syllogism(8, 6);
+        print_premises(proof.deduction().premises());
         println!();
         let proof = proof.conclude().unwrap().root().unwrap().clone();
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         assert!(proof.conclude());
     }
 
@@ -410,28 +413,28 @@ mod tests {
         let premises = [].into();
         let conclusion = if_p_q(p.clone(), if_p_q(q.clone(), p.clone()));
         let proof = RootProof::new(premises, conclusion);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!("// {}", proof.conclusion());
         println!();
         let proof = CondProof::new(Box::new(Proof::Root(proof)), p.clone());
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
         let mut proof = CondProof::new(Box::new(Proof::Cond(proof)), q.clone());
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
-        proof.direct_mut().addition(0, p.clone());
-        print_premises(proof.direct().premises());
+        proof.deduction_mut().addition(0, p.clone());
+        print_premises(proof.deduction().premises());
         println!();
         proof
-            .direct_mut()
+            .deduction_mut()
             .replace(2, var_expr, ReplacementOp::TautologyOr);
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
         let proof = proof.conclude().cond().unwrap().clone();
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         println!();
         let proof = proof.conclude().root().unwrap().clone();
-        print_premises(proof.direct().premises());
+        print_premises(proof.deduction().premises());
         assert!(proof.conclude());
     }
 

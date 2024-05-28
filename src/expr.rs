@@ -10,18 +10,18 @@ pub enum Expr {
     Var(Var),
 }
 impl Expr {
-    pub fn is_leaf(&self) -> bool {
+    pub fn is_branching(&self) -> bool {
         match self {
-            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => true,
-            Expr::BinOp(_) => false,
+            Expr::BinOp(_) => true,
+            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
         }
     }
 
     pub fn add_necessary_paren(&self) -> String {
-        if self.is_leaf() {
-            self.to_string()
-        } else {
+        if self.is_branching() {
             format!("({})", self)
+        } else {
+            self.to_string()
         }
     }
 }
