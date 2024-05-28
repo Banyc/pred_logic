@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
@@ -22,6 +22,35 @@ impl Expr {
             format!("({})", self)
         } else {
             self.to_string()
+        }
+    }
+
+    pub fn free_variables(&self) -> HashSet<Var> {
+        match self {
+            Expr::Quant(x) => {
+                let mut var = x.expr.free_variables();
+                var.remove(&x.var);
+                var
+            }
+            Expr::Pred(x) => {
+                let mut variables = HashSet::new();
+                for ind in &x.ind {
+                    let var = match ind {
+                        Ind::Const(x) => x,
+                        Ind::Var(x) => x,
+                    };
+                    variables.insert(var.clone());
+                }
+                variables
+            }
+            Expr::BinOp(x) => {
+                let mut left = x.left.free_variables();
+                let right = x.right.free_variables();
+                left.extend(right);
+                left
+            }
+            Expr::UnOp(x) => x.expr.free_variables(),
+            Expr::Ident(_) | Expr::Var(_) => HashSet::new(),
         }
     }
 }
@@ -50,7 +79,7 @@ impl core::fmt::Display for Pred {
             stacked_ind.push(' ');
             stacked_ind.push_str(&ind.to_string());
         }
-        write!(f, "{} {}", self.name, stacked_ind)
+        write!(f, "{}{}", self.name, stacked_ind)
     }
 }
 

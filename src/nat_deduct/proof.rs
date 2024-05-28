@@ -1,13 +1,20 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
-    expr::{Expr, UnnamedGen, Var},
+    expr::{Expr, Ind, UnnamedGen, Var},
     extract::{self, extract, SymMap},
 };
 
 use super::{
     and, if_p_q, not,
-    r#impl::{addition, simplification, Syllogism},
+    r#impl::{
+        addition, existential_generalization, existential_instantiation, simplification,
+        universal_generalization, universal_instantiation, Syllogism,
+    },
     repl::{self, ReplacementOp},
 };
 
@@ -91,7 +98,7 @@ pub struct CondProof {
 impl CondProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
         let mut deduction = prev_proof.deduction().clone();
-        deduction.push_premise(Arc::clone(&assume), None);
+        deduction.push_premise(Arc::clone(&assume), None, PremiseType::Assumed);
         Self {
             prev_proof,
             deduction,
@@ -110,9 +117,11 @@ impl CondProof {
         let last = self.deduction().premises().last().unwrap();
         let cond = if_p_q(Arc::clone(&self.assume), Arc::clone(last));
         let unnamed_space = self.deduction.unnamed_space().clone();
-        self.prev_proof
-            .deduction_mut()
-            .push_premise(cond, Some(unnamed_space));
+        self.prev_proof.deduction_mut().push_premise(
+            cond,
+            Some(unnamed_space),
+            PremiseType::Deducted,
+        );
         *self.prev_proof
     }
 }
@@ -126,7 +135,7 @@ pub struct IndirectProof {
 impl IndirectProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
         let mut deduction = prev_proof.deduction().clone();
-        deduction.push_premise(Arc::clone(&assume), None);
+        deduction.push_premise(Arc::clone(&assume), None, PremiseType::Assumed);
         Self {
             prev_proof,
             deduction,
@@ -149,7 +158,7 @@ impl IndirectProof {
         }
         self.prev_proof
             .deduction_mut()
-            .push_premise(not(self.assume), None);
+            .push_premise(not(self.assume), None, PremiseType::Deducted);
         Ok(*self.prev_proof)
     }
 }
@@ -165,15 +174,25 @@ pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
 }
 
 #[derive(Debug, Clone)]
+pub enum PremiseType {
+    Assumed,
+    Deducted,
+}
+
+#[derive(Debug, Clone)]
 pub struct Deduction {
     unnamed_space: UnnamedGen,
     premises: Vec<Arc<Expr>>,
+    assumed_premises: Vec<usize>,
+    free_variables_in_existential_instantiation: HashSet<Var>,
 }
 impl Deduction {
     pub fn new(premises: Vec<Arc<Expr>>, unnamed_space: UnnamedGen) -> Self {
         Self {
             unnamed_space,
             premises,
+            assumed_premises: vec![],
+            free_variables_in_existential_instantiation: HashSet::new(),
         }
     }
 
@@ -183,7 +202,18 @@ impl Deduction {
     pub fn unnamed_space(&self) -> &UnnamedGen {
         &self.unnamed_space
     }
-    pub fn push_premise(&mut self, prem: Arc<Expr>, unnamed_space: Option<UnnamedGen>) {
+    pub fn push_premise(
+        &mut self,
+        prem: Arc<Expr>,
+        unnamed_space: Option<UnnamedGen>,
+        ty: PremiseType,
+    ) {
+        match ty {
+            PremiseType::Assumed => {
+                self.assumed_premises.push(self.premises.len());
+            }
+            PremiseType::Deducted => (),
+        }
         self.premises.push(prem);
         if let Some(x) = unnamed_space {
             self.unnamed_space = x;
@@ -236,13 +266,55 @@ impl Deduction {
         let new = extract::replace(&pat, Cow::Borrowed(&map));
         self.premises.push(new);
     }
+
+    pub fn universal_instantiation(&mut self, prem: usize, ind: Ind) {
+        let prem = &self.premises[prem];
+        let Some(prem) = universal_instantiation(prem, ind) else {
+            return;
+        };
+        self.premises.push(prem);
+    }
+    pub fn universal_generalization(&mut self, prem: usize, old: Var, new: Var) {
+        if self.assumed_premises.contains(&prem) {
+            return;
+        }
+        if self
+            .free_variables_in_existential_instantiation
+            .contains(&old)
+        {
+            return;
+        }
+        let prem = &self.premises[prem];
+        let Some(prem) = universal_generalization(prem, old, new) else {
+            return;
+        };
+        self.premises.push(prem);
+    }
+    pub fn existential_instantiation(&mut self, prem: usize) -> Option<Var> {
+        let prem = &self.premises[prem];
+        let (prem, var) = existential_instantiation(prem, &mut self.unnamed_space)?;
+        self.free_variables_in_existential_instantiation
+            .extend(prem.free_variables());
+        self.premises.push(prem);
+        Some(var)
+    }
+    pub fn existential_generalization(&mut self, prem: usize, old: Ind, new: Var) {
+        let prem = &self.premises[prem];
+        let Some(prem) = existential_generalization(prem, old, new) else {
+            return;
+        };
+        self.premises.push(prem);
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::nat_deduct::{
-        if_p_q, or,
-        tests::{named_var_expr, var_expr},
+    use crate::{
+        expr::{Named, Pred, Quant, QuantOp},
+        nat_deduct::{
+            if_p_q, or,
+            tests::{named_var_expr, var_expr},
+        },
     };
 
     use super::*;
@@ -436,6 +508,185 @@ mod tests {
         let proof = proof.conclude().root().unwrap().clone();
         print_premises(proof.deduction().premises());
         assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_ui() {
+        let x = named_var("x");
+        let p = named_var("p");
+        let x_ind = Ind::Var(x.clone());
+        let p_ind = Ind::Const(p.clone());
+        let e_x = singular_pred("E", x_ind.clone());
+        let e_p = singular_pred("E", p_ind.clone());
+        let s_x = singular_pred("S", x_ind.clone());
+        let s_p = singular_pred("S", p_ind.clone());
+        let premises = [
+            every(x.clone(), if_p_q(e_x.clone(), s_x.clone())),
+            e_p.clone(),
+        ]
+        .into();
+        let conclusion = s_p.clone();
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(0, p_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(2, 1);
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_ug() {
+        let x = named_var("x");
+        let y = named_var("y");
+        let x_ind = Ind::Var(x.clone());
+        let y_ind = Ind::Var(y.clone());
+        let p_x = singular_pred("P", x_ind.clone());
+        let d_x = singular_pred("D", x_ind.clone());
+        let c_x = singular_pred("C", x_ind.clone());
+        let premises = [
+            every(x.clone(), if_p_q(p_x.clone(), d_x.clone())),
+            every(x.clone(), if_p_q(d_x.clone(), c_x.clone())),
+        ]
+        .into();
+        let conclusion = every(x.clone(), if_p_q(p_x.clone(), c_x.clone()));
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(0, y_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(1, y_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(2, 3);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_generalization(4, y.clone(), x.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_eg() {
+        let x = named_var("x");
+        let a = named_var("a");
+        let x_ind = Ind::Var(x.clone());
+        let a_ind = Ind::Const(a.clone());
+        let t_x = singular_pred("T", x_ind.clone());
+        let s_x = singular_pred("S", x_ind.clone());
+        let t_a = singular_pred("T", a_ind.clone());
+        let premises = [
+            every(x.clone(), if_p_q(t_x.clone(), s_x.clone())),
+            t_a.clone(),
+        ]
+        .into();
+        let conclusion = exists(x.clone(), s_x.clone());
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(0, a_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(2, 1);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .existential_generalization(3, a_ind.clone(), x.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_ei() {
+        let x = named_var("x");
+        let x_ind = Ind::Var(x.clone());
+        let a_x = singular_pred("A", x_ind.clone());
+        let c_x = singular_pred("C", x_ind.clone());
+        let g_x = singular_pred("G", x_ind.clone());
+        let premises = [
+            every(x.clone(), if_p_q(a_x.clone(), c_x.clone())),
+            exists(x.clone(), and(a_x.clone(), g_x.clone())),
+        ]
+        .into();
+        let conclusion = exists(x.clone(), and(g_x.clone(), c_x.clone()));
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        let a = proof.deduction_mut().existential_instantiation(1).unwrap();
+        let a_ind = Ind::Const(a.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(0, a_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(2, var_expr, ReplacementOp::Commutativity);
+        proof.deduction_mut().simplification(4);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(2);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(3, 6);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(5, 7);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .existential_generalization(8, a_ind.clone(), x.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    fn every(var: Var, expr: Arc<Expr>) -> Arc<Expr> {
+        Arc::new(Expr::Quant(Quant {
+            op: QuantOp::Every,
+            var,
+            expr,
+        }))
+    }
+    fn exists(var: Var, expr: Arc<Expr>) -> Arc<Expr> {
+        Arc::new(Expr::Quant(Quant {
+            op: QuantOp::Exists,
+            var,
+            expr,
+        }))
+    }
+    fn named_var(name: &str) -> Var {
+        Var::Named(Named { name: name.into() })
+    }
+    fn singular_pred(name: &str, ind: Ind) -> Arc<Expr> {
+        Arc::new(Expr::Pred(Pred {
+            name: name.into(),
+            ind: vec![ind.clone()],
+        }))
     }
 
     fn print_premises(premises: &[Arc<Expr>]) {

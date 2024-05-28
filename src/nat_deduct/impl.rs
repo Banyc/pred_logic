@@ -169,8 +169,8 @@ pub fn universal_generalization(prem: &Arc<Expr>, old: Var, new: Var) -> Option<
 pub fn existential_instantiation(
     prem: &Arc<Expr>,
     unnamed_space: &mut UnnamedGen,
-) -> Option<Arc<Expr>> {
-    let ind = Var::Unnamed(unnamed_space.gen());
+) -> Option<(Arc<Expr>, Var)> {
+    let var = Var::Unnamed(unnamed_space.gen());
     let Expr::Quant(quant) = prem.as_ref() else {
         return None;
     };
@@ -178,9 +178,9 @@ pub fn existential_instantiation(
         return None;
     };
     let old_ind = quant.ind();
-    let new_ind = Ind::Const(ind);
+    let new_ind = Ind::Const(var.clone());
     let map = SymMap::from_ind_map(HashMap::from_iter([(old_ind, new_ind)]));
-    Some(replace(&quant.expr, Cow::Borrowed(&map)))
+    Some((replace(&quant.expr, Cow::Borrowed(&map)), var))
 }
 
 /// ```math
@@ -192,7 +192,7 @@ pub fn existential_generalization(prem: &Arc<Expr>, old: Ind, new: Var) -> Optio
     let map = SymMap::from_ind_map(HashMap::from_iter([(old, new_ind)]));
     let stat_func = replace(prem, Cow::Borrowed(&map));
     Some(Arc::new(Expr::Quant(Quant {
-        op: QuantOp::Every,
+        op: QuantOp::Exists,
         var: new,
         expr: stat_func,
     })))
