@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
     expr::{BinOp, BinOpExpr, Expr, Ind, Quant, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
@@ -138,18 +138,18 @@ pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
 /// ```
 pub fn universal_instantiation(prem: &Arc<Expr>, ind: Ind) -> Option<Arc<Expr>> {
     let Expr::UnOp(UnOpExpr {
-        op: UnOp::Quant(Quant {
-            op: QuantOp::Every,
-            ind: x,
-        }),
+        op: UnOp::Quant(quant),
         expr,
     }) = prem.as_ref()
     else {
         return None;
     };
-    let var_ind = Ind::Var(x.clone());
-    let map = HashMap::from_iter([(var_ind, ind)]);
-    Some(replace_ind(expr, &map))
+    let QuantOp::Every = &quant.op else {
+        return None;
+    };
+    let old_ind = quant.ind();
+    let map = HashMap::from_iter([(old_ind, ind)]);
+    Some(replace_ind(expr, Cow::Borrowed(&map)))
 }
 
 /// ```math
@@ -159,14 +159,38 @@ pub fn universal_generalization(prem: &Arc<Expr>, old: Var, new: Var) -> Option<
     let old_ind = Ind::Var(old);
     let new_ind = Ind::Var(new.clone());
     let map = HashMap::from_iter([(old_ind, new_ind)]);
-    let stat_func = replace_ind(prem, &map);
+    let stat_func = replace_ind(prem, Cow::Borrowed(&map));
     Some(Arc::new(Expr::UnOp(UnOpExpr {
         op: UnOp::Quant(Quant {
             op: QuantOp::Every,
-            ind: new,
+            var: new,
         }),
         expr: stat_func,
     })))
+}
+
+/// ```math
+/// (∃x)Fx // Fa
+/// ```
+pub fn existential_instantiation(
+    prem: &Arc<Expr>,
+    unnamed_space: &mut UnnamedGen,
+) -> Option<Arc<Expr>> {
+    let ind = Var::Unnamed(unnamed_space.gen());
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Quant(quant),
+        expr,
+    }) = prem.as_ref()
+    else {
+        return None;
+    };
+    let QuantOp::Exists = &quant.op else {
+        return None;
+    };
+    let old_ind = quant.ind();
+    let new_ind = Ind::Const(ind);
+    let map = HashMap::from_iter([(old_ind, new_ind)]);
+    Some(replace_ind(expr, Cow::Borrowed(&map)))
 }
 
 #[cfg(test)]

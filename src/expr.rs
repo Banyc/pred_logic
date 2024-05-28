@@ -182,11 +182,16 @@ impl core::fmt::Display for UnOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quant {
     pub op: QuantOp,
-    pub ind: Var,
+    pub var: Var,
+}
+impl Quant {
+    pub fn ind(&self) -> Ind {
+        Ind::Var(self.var.clone())
+    }
 }
 impl core::fmt::Display for Quant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{})", self.op, self.ind)
+        write!(f, "({}{})", self.op, self.var)
     }
 }
 

@@ -1,6 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
-use crate::expr::{BinOpExpr, EquivInd, Expr, Ind, Pred, UnOpExpr, Var};
+use crate::expr::{BinOpExpr, EquivInd, Expr, Ind, Pred, UnOp, UnOpExpr, Var};
 
 pub type VarExprMap = HashMap<Var, Arc<Expr>>;
 
@@ -82,7 +82,7 @@ pub fn replace(src: &Arc<Expr>, map: &VarExprMap) -> Arc<Expr> {
 pub type IndMap = HashMap<Ind, Ind>;
 
 /// Replace individuals
-pub fn replace_ind(src: &Arc<Expr>, map: &IndMap) -> Arc<Expr> {
+pub fn replace_ind(src: &Arc<Expr>, map: Cow<'_, IndMap>) -> Arc<Expr> {
     match src.as_ref() {
         Expr::Pred(x) => {
             let ind = &x.ind;
@@ -108,12 +108,22 @@ pub fn replace_ind(src: &Arc<Expr>, map: &IndMap) -> Arc<Expr> {
         Expr::Var(_) => Arc::clone(src),
         Expr::BinOp(x) => Arc::new(Expr::BinOp(BinOpExpr {
             op: x.op.clone(),
-            left: replace_ind(&x.left, map),
-            right: replace_ind(&x.right, map),
+            left: replace_ind(&x.left, map.clone()),
+            right: replace_ind(&x.right, map.clone()),
         })),
-        Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
-            op: x.op.clone(),
-            expr: replace_ind(&x.expr, map),
-        })),
+        Expr::UnOp(x) => {
+            // Exclude shadowed individuals
+            let map = if let UnOp::Quant(quant) = &x.op {
+                let mut map = map.into_owned();
+                map.remove(&quant.ind());
+                Cow::Owned(map)
+            } else {
+                map
+            };
+            Arc::new(Expr::UnOp(UnOpExpr {
+                op: x.op.clone(),
+                expr: replace_ind(&x.expr, map),
+            }))
+        }
     }
 }
