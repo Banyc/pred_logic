@@ -1,8 +1,8 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
-    expr::{BinOp, BinOpExpr, Expr, Ind, Quant, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
-    extract::{extract, merge, replace_ind, VarExprMap},
+    expr::{BinOp, BinOpExpr, Expr, Ind, Quant, QuantOp, UnnamedGen, Var},
+    extract::{extract, replace, SymMap},
 };
 
 use super::{
@@ -30,7 +30,7 @@ macro_rules! syllogism_implication {
                 $( Arc::new(Expr::Var($var.clone())), )*
             );
             let captured = self.extract(&major_pat, &minor_pat)?;
-            $( let $var = captured.get(& $var).unwrap(); )*
+            $( let $var = captured.expr().get(& $var).unwrap(); )*
             let conclusion = $conclusion(
                 $( Arc::clone($var), )*
             );
@@ -108,10 +108,10 @@ impl Syllogism<'_> {
         self.conjunction()
     }
 
-    fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<VarExprMap> {
+    fn extract(&self, major_pattern: &Expr, minor_pattern: &Expr) -> Option<SymMap> {
         let captured_1 = extract(self.major_prem, major_pattern)?;
         let captured_2 = extract(self.minor_prem, minor_pattern)?;
-        merge(captured_1, captured_2)
+        captured_1.merge(captured_2)
     }
 }
 
@@ -137,19 +137,15 @@ pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
 /// (x)Fx // Fa
 /// ```
 pub fn universal_instantiation(prem: &Arc<Expr>, ind: Ind) -> Option<Arc<Expr>> {
-    let Expr::UnOp(UnOpExpr {
-        op: UnOp::Quant(quant),
-        expr,
-    }) = prem.as_ref()
-    else {
+    let Expr::Quant(quant) = prem.as_ref() else {
         return None;
     };
     let QuantOp::Every = &quant.op else {
         return None;
     };
     let old_ind = quant.ind();
-    let map = HashMap::from_iter([(old_ind, ind)]);
-    Some(replace_ind(expr, Cow::Borrowed(&map)))
+    let map = SymMap::from_ind_map(HashMap::from_iter([(old_ind, ind)]));
+    Some(replace(&quant.expr, Cow::Borrowed(&map)))
 }
 
 /// ```math
@@ -158,13 +154,11 @@ pub fn universal_instantiation(prem: &Arc<Expr>, ind: Ind) -> Option<Arc<Expr>> 
 pub fn universal_generalization(prem: &Arc<Expr>, old: Var, new: Var) -> Option<Arc<Expr>> {
     let old_ind = Ind::Var(old);
     let new_ind = Ind::Var(new.clone());
-    let map = HashMap::from_iter([(old_ind, new_ind)]);
-    let stat_func = replace_ind(prem, Cow::Borrowed(&map));
-    Some(Arc::new(Expr::UnOp(UnOpExpr {
-        op: UnOp::Quant(Quant {
-            op: QuantOp::Every,
-            var: new,
-        }),
+    let map = SymMap::from_ind_map(HashMap::from_iter([(old_ind, new_ind)]));
+    let stat_func = replace(prem, Cow::Borrowed(&map));
+    Some(Arc::new(Expr::Quant(Quant {
+        op: QuantOp::Every,
+        var: new,
         expr: stat_func,
     })))
 }
@@ -177,11 +171,7 @@ pub fn existential_instantiation(
     unnamed_space: &mut UnnamedGen,
 ) -> Option<Arc<Expr>> {
     let ind = Var::Unnamed(unnamed_space.gen());
-    let Expr::UnOp(UnOpExpr {
-        op: UnOp::Quant(quant),
-        expr,
-    }) = prem.as_ref()
-    else {
+    let Expr::Quant(quant) = prem.as_ref() else {
         return None;
     };
     let QuantOp::Exists = &quant.op else {
@@ -189,8 +179,8 @@ pub fn existential_instantiation(
     };
     let old_ind = quant.ind();
     let new_ind = Ind::Const(ind);
-    let map = HashMap::from_iter([(old_ind, new_ind)]);
-    Some(replace_ind(expr, Cow::Borrowed(&map)))
+    let map = SymMap::from_ind_map(HashMap::from_iter([(old_ind, new_ind)]));
+    Some(replace(&quant.expr, Cow::Borrowed(&map)))
 }
 
 /// ```math
@@ -199,13 +189,11 @@ pub fn existential_instantiation(
 /// ```
 pub fn existential_generalization(prem: &Arc<Expr>, old: Ind, new: Var) -> Option<Arc<Expr>> {
     let new_ind = Ind::Var(new.clone());
-    let map = HashMap::from_iter([(old, new_ind)]);
-    let stat_func = replace_ind(prem, Cow::Borrowed(&map));
-    Some(Arc::new(Expr::UnOp(UnOpExpr {
-        op: UnOp::Quant(Quant {
-            op: QuantOp::Every,
-            var: new,
-        }),
+    let map = SymMap::from_ind_map(HashMap::from_iter([(old, new_ind)]));
+    let stat_func = replace(prem, Cow::Borrowed(&map));
+    Some(Arc::new(Expr::Quant(Quant {
+        op: QuantOp::Every,
+        var: new,
         expr: stat_func,
     })))
 }

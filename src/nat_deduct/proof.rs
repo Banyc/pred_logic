@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
     expr::{Expr, UnnamedGen, Var},
-    extract::{self, extract},
+    extract::{self, extract, SymMap},
 };
 
 use super::{
@@ -141,14 +141,14 @@ impl DirectProof {
         let Some(captured) = extract(prem, &pat) else {
             return;
         };
-        let Some(expr) = captured.get(&var) else {
+        let Some(expr) = captured.expr().get(&var) else {
             return;
         };
         let Some(equiv) = repl::replace(expr, op, self.unnamed_space.clone()) else {
             return;
         };
-        let map = HashMap::from_iter([(var, equiv)]);
-        let new = extract::replace(&pat, &map);
+        let map = SymMap::from_expr_map(HashMap::from_iter([(var, equiv)]));
+        let new = extract::replace(&pat, Cow::Borrowed(&map));
         self.premises.push(new);
     }
 }

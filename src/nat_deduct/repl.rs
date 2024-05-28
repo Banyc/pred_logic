@@ -89,7 +89,7 @@ macro_rules! replace {
                 $( Arc::new(Expr::Var($var.clone())), )*
             );
             let captured = extract(expr, &pat)?;
-            $( let $var = captured.get(& $var).unwrap(); )*
+            $( let $var = captured.expr().get(& $var).unwrap(); )*
             let equiv = $equiv(
                 $( Arc::clone($var), )*
             );

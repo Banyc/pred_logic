@@ -2,16 +2,17 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
+    Quant(Quant),
     Pred(Pred),
     BinOp(BinOpExpr),
     UnOp(UnOpExpr),
-    EquivInd(EquivInd),
+    Ident(Ident),
     Var(Var),
 }
 impl Expr {
     pub fn is_leaf(&self) -> bool {
         match self {
-            Expr::Pred(_) | Expr::EquivInd(_) | Expr::Var(_) | Expr::UnOp(_) => true,
+            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => true,
             Expr::BinOp(_) => false,
         }
     }
@@ -27,10 +28,11 @@ impl Expr {
 impl core::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Expr::Quant(x) => write!(f, "{x}"),
             Expr::Pred(x) => write!(f, "{x}"),
             Expr::BinOp(x) => write!(f, "{x}"),
             Expr::UnOp(x) => write!(f, "{x}"),
-            Expr::EquivInd(x) => write!(f, "{x}"),
+            Expr::Ident(x) => write!(f, "{x}"),
             Expr::Var(x) => write!(f, "{x}"),
         }
     }
@@ -168,13 +170,11 @@ impl core::fmt::Display for UnOpExpr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnOp {
     Not,
-    Quant(Quant),
 }
 impl core::fmt::Display for UnOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             UnOp::Not => write!(f, "∼"),
-            UnOp::Quant(x) => write!(f, "{x}"),
         }
     }
 }
@@ -183,6 +183,7 @@ impl core::fmt::Display for UnOp {
 pub struct Quant {
     pub op: QuantOp,
     pub var: Var,
+    pub expr: Arc<Expr>,
 }
 impl Quant {
     pub fn ind(&self) -> Ind {
@@ -191,7 +192,7 @@ impl Quant {
 }
 impl core::fmt::Display for Quant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{})", self.op, self.var)
+        write!(f, "({}{}){}", self.op, self.var, self.expr)
     }
 }
 
@@ -210,11 +211,11 @@ impl core::fmt::Display for QuantOp {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EquivInd {
+pub struct Ident {
     pub left: Ind,
     pub right: Ind,
 }
-impl core::fmt::Display for EquivInd {
+impl core::fmt::Display for Ident {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} = {}", self.left, self.right)
     }

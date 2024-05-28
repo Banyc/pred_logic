@@ -1,29 +1,44 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
-use crate::expr::{BinOpExpr, EquivInd, Expr, Ind, Pred, UnOp, UnOpExpr, Var};
-
-pub type VarExprMap = HashMap<Var, Arc<Expr>>;
+use crate::expr::{BinOpExpr, Expr, Ident, Ind, Pred, Quant, UnOpExpr, Var};
 
 /// Return captured expressions referred by variables in the pattern
-pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
+pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<SymMap> {
     match (src.as_ref(), pattern) {
         (_, Expr::Var(var)) => {
-            let map = VarExprMap::from_iter([(var.clone(), Arc::clone(src))]);
+            let map = HashMap::from_iter([(var.clone(), Arc::clone(src))]);
+            Some(SymMap::from_expr_map(map))
+        }
+        (Expr::Pred(s), Expr::Pred(p)) => {
+            let same_name = s.name == p.name;
+            let same_len = s.ind.len() == p.ind.len();
+            if !same_name || !same_len {
+                return None;
+            }
+            let mut map = SymMap::new();
+            for (s, p) in s.ind.iter().zip(p.ind.iter()) {
+                if !map.ind_insert(p.clone(), s.clone()) {
+                    return None;
+                }
+            }
             Some(map)
         }
-        (Expr::Pred(_), Expr::Pred(_)) | (Expr::EquivInd(_), Expr::EquivInd(_)) => {
-            if src.as_ref() == pattern {
-                Some(VarExprMap::new())
-            } else {
-                None
+        (Expr::Ident(s), Expr::Ident(p)) => {
+            let mut map = SymMap::new();
+            if !map.ind_insert(p.left.clone(), s.left.clone()) {
+                return None;
             }
+            if !map.ind_insert(p.right.clone(), s.right.clone()) {
+                return None;
+            }
+            Some(map)
         }
         (Expr::BinOp(s), Expr::BinOp(p)) => {
             let same_op = s.op == p.op;
             let left = extract(&s.left, &p.left);
             let right = extract(&s.right, &p.right);
             match (same_op, left, right) {
-                (true, Some(left), Some(right)) => merge(left, right),
+                (true, Some(left), Some(right)) => left.merge(right),
                 _ => None,
             }
         }
@@ -35,61 +50,120 @@ pub fn extract(src: &Arc<Expr>, pattern: &Expr) -> Option<VarExprMap> {
                 _ => None,
             }
         }
+        (Expr::Quant(s), Expr::Quant(p)) => {
+            let same_op = s.op == p.op;
+            let ind = SymMap::from_ind_map(HashMap::from_iter([(p.ind(), s.ind())]));
+            let expr = extract(&s.expr, &p.expr);
+            match (same_op, expr) {
+                (true, Some(expr)) => expr.merge(ind),
+                _ => None,
+            }
+        }
         (Expr::Var(_), _) => None,
         _ => None,
     }
 }
 
-/// Merge two variable-to-expression tables together if the same variables refer to the same expressions
-pub fn merge(mut left: VarExprMap, right: VarExprMap) -> Option<VarExprMap> {
-    for (k, r) in right {
-        match left.get(&k) {
-            Some(l) => {
-                if *l != r {
-                    return None;
-                }
-            }
-            None => {
-                left.insert(k, r);
-            }
+#[derive(Debug, Clone)]
+pub struct SymMap {
+    expr: HashMap<Var, Arc<Expr>>,
+    ind: HashMap<Ind, Ind>,
+}
+impl SymMap {
+    pub fn new() -> Self {
+        Self {
+            expr: HashMap::new(),
+            ind: HashMap::new(),
         }
     }
-    Some(left)
+    pub fn from_expr_map(expr: HashMap<Var, Arc<Expr>>) -> Self {
+        Self {
+            expr,
+            ind: HashMap::new(),
+        }
+    }
+    pub fn from_ind_map(ind: HashMap<Ind, Ind>) -> Self {
+        Self {
+            expr: HashMap::new(),
+            ind,
+        }
+    }
+
+    pub fn expr(&self) -> &HashMap<Var, Arc<Expr>> {
+        &self.expr
+    }
+    /// `true`: successful
+    #[must_use]
+    pub fn ind_insert(&mut self, key: Ind, value: Ind) -> bool {
+        match (&key, &value) {
+            (Ind::Const(_), Ind::Const(_)) | (Ind::Var(_), Ind::Var(_)) => (),
+            (Ind::Const(_), Ind::Var(_)) | (Ind::Var(_), Ind::Const(_)) => return false,
+        }
+        let Some(x) = self.ind.get(&key) else {
+            self.ind.insert(key, value);
+            return true;
+        };
+        x == &value
+    }
+    pub fn ind_get_ind(&self, k: &Ind) -> Option<Ind> {
+        let ind = self.ind.get(k)?.clone();
+        Some(ind)
+    }
+    pub fn ind_remove(&mut self, k: &Ind) {
+        self.ind.remove(k);
+    }
+
+    /// Merge two variable-to-expression tables together if the same variables refer to the same expressions
+    pub fn merge(mut self, other: Self) -> Option<Self> {
+        for (k, r) in other.expr {
+            match self.expr.get(&k) {
+                Some(l) => {
+                    if *l != r {
+                        return None;
+                    }
+                }
+                None => {
+                    self.expr.insert(k, r);
+                }
+            }
+        }
+        for (k, r) in other.ind {
+            match self.ind.get(&k) {
+                Some(l) => {
+                    if *l != r {
+                        return None;
+                    }
+                }
+                None => {
+                    self.ind.insert(k, r);
+                }
+            }
+        }
+        Some(self)
+    }
+}
+impl Default for SymMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-/// Replace variables to given expressions
-pub fn replace(src: &Arc<Expr>, map: &VarExprMap) -> Arc<Expr> {
+/// Replace variables to given expressions.
+/// Replace individuals.
+pub fn replace(src: &Arc<Expr>, map: Cow<'_, SymMap>) -> Arc<Expr> {
     match src.as_ref() {
         Expr::Var(x) => {
-            let Some(expr) = map.get(x) else {
+            let Some(expr) = map.expr().get(x) else {
                 return Arc::clone(src);
             };
             Arc::clone(expr)
         }
-        Expr::Pred(_) | Expr::EquivInd(_) => Arc::clone(src),
-        Expr::BinOp(x) => Arc::new(Expr::BinOp(BinOpExpr {
-            op: x.op.clone(),
-            left: replace(&x.left, map),
-            right: replace(&x.right, map),
-        })),
-        Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
-            op: x.op.clone(),
-            expr: replace(&x.expr, map),
-        })),
-    }
-}
-
-pub type IndMap = HashMap<Ind, Ind>;
-
-/// Replace individuals
-pub fn replace_ind(src: &Arc<Expr>, map: Cow<'_, IndMap>) -> Arc<Expr> {
-    match src.as_ref() {
         Expr::Pred(x) => {
             let ind = &x.ind;
             let ind = ind
                 .iter()
-                .map(|x| match map.get(x) {
-                    Some(x) => x.clone(),
+                .map(|x| match map.ind_get_ind(x) {
+                    Some(x) => x,
                     None => x.clone(),
                 })
                 .collect::<Vec<Ind>>();
@@ -99,30 +173,35 @@ pub fn replace_ind(src: &Arc<Expr>, map: Cow<'_, IndMap>) -> Arc<Expr> {
             };
             Arc::new(Expr::Pred(pred))
         }
-        Expr::EquivInd(x) => {
-            let left = map.get(&x.left).unwrap_or(&x.left).clone();
-            let right = map.get(&x.right).unwrap_or(&x.right).clone();
-            let equiv_ind = EquivInd { left, right };
-            Arc::new(Expr::EquivInd(equiv_ind))
+        Expr::Ident(x) => {
+            let left = match map.ind_get_ind(&x.left) {
+                Some(x) => x,
+                None => x.left.clone(),
+            };
+            let right = match map.ind_get_ind(&x.right) {
+                Some(x) => x,
+                None => x.right.clone(),
+            };
+            let equiv_ind = Ident { left, right };
+            Arc::new(Expr::Ident(equiv_ind))
         }
-        Expr::Var(_) => Arc::clone(src),
         Expr::BinOp(x) => Arc::new(Expr::BinOp(BinOpExpr {
             op: x.op.clone(),
-            left: replace_ind(&x.left, map.clone()),
-            right: replace_ind(&x.right, map.clone()),
+            left: replace(&x.left, map.clone()),
+            right: replace(&x.right, map.clone()),
         })),
-        Expr::UnOp(x) => {
-            // Exclude shadowed individuals
-            let map = if let UnOp::Quant(quant) = &x.op {
-                let mut map = map.into_owned();
-                map.remove(&quant.ind());
-                Cow::Owned(map)
-            } else {
-                map
-            };
-            Arc::new(Expr::UnOp(UnOpExpr {
+        Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
+            op: x.op.clone(),
+            expr: replace(&x.expr, map.clone()),
+        })),
+        Expr::Quant(x) => {
+            // Protect its variable from being replaced
+            let mut map = map.into_owned();
+            map.ind_remove(&x.ind());
+            Arc::new(Expr::Quant(Quant {
                 op: x.op.clone(),
-                expr: replace_ind(&x.expr, map),
+                var: x.var.clone(),
+                expr: replace(&x.expr, Cow::Owned(map)),
             }))
         }
     }
