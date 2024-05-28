@@ -198,26 +198,26 @@ pub fn replace(src: &Arc<Expr>, map: Cow<'_, SymMap>) -> Arc<Expr> {
             expr: replace(&x.expr, map.clone()),
         })),
         Expr::Quant(x) => {
-            // // Protect its variable from being replaced
-            // let mut map = map.into_owned();
-            // map.ind_remove(&x.ind());
-            // Arc::new(Expr::Quant(Quant {
-            //     op: x.op.clone(),
-            //     var: x.var.clone(),
-            //     expr: replace(&x.expr, Cow::Owned(map)),
-            // }))
-            let var = match map.ind_get_ind(&x.ind()) {
-                Some(ind) => match ind {
-                    Ind::Const(_) => x.var.clone(),
-                    Ind::Var(x) => x.clone(),
-                },
-                None => x.var.clone(),
-            };
+            // Protect its variable from being replaced
+            let mut map = map.into_owned();
+            map.ind_remove(&x.ind());
             Arc::new(Expr::Quant(Quant {
                 op: x.op.clone(),
-                var,
-                expr: replace(&x.expr, map),
+                var: x.var.clone(),
+                expr: replace(&x.expr, Cow::Owned(map)),
             }))
+            // let var = match map.ind_get_ind(&x.ind()) {
+            //     Some(ind) => match ind {
+            //         Ind::Const(_) => x.var.clone(),
+            //         Ind::Var(x) => x.clone(),
+            //     },
+            //     None => x.var.clone(),
+            // };
+            // Arc::new(Expr::Quant(Quant {
+            //     op: x.op.clone(),
+            //     var,
+            //     expr: replace(&x.expr, map),
+            // }))
         }
     }
 }
