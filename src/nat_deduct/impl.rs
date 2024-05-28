@@ -193,6 +193,23 @@ pub fn existential_instantiation(
     Some(replace_ind(expr, Cow::Borrowed(&map)))
 }
 
+/// ```math
+/// Fa // (∃x)Fx
+/// Fy // (∃x)Fx
+/// ```
+pub fn existential_generalization(prem: &Arc<Expr>, old: Ind, new: Var) -> Option<Arc<Expr>> {
+    let new_ind = Ind::Var(new.clone());
+    let map = HashMap::from_iter([(old, new_ind)]);
+    let stat_func = replace_ind(prem, Cow::Borrowed(&map));
+    Some(Arc::new(Expr::UnOp(UnOpExpr {
+        op: UnOp::Quant(Quant {
+            op: QuantOp::Every,
+            var: new,
+        }),
+        expr: stat_func,
+    })))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::nat_deduct::{not, tests::named_var_expr};
