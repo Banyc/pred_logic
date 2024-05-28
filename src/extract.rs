@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::expr::{BinOpExpr, Expr, UnOpExpr, Var};
+use crate::expr::{BinOpExpr, EquivInd, Expr, Ind, Pred, UnOpExpr, Var};
 
 pub type VarExprMap = HashMap<Var, Arc<Expr>>;
 
@@ -75,6 +75,45 @@ pub fn replace(src: &Arc<Expr>, map: &VarExprMap) -> Arc<Expr> {
         Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
             op: x.op.clone(),
             expr: replace(&x.expr, map),
+        })),
+    }
+}
+
+pub type IndMap = HashMap<Ind, Ind>;
+
+/// Replace individuals
+pub fn replace_ind(src: &Arc<Expr>, map: &IndMap) -> Arc<Expr> {
+    match src.as_ref() {
+        Expr::Pred(x) => {
+            let ind = &x.ind;
+            let ind = ind
+                .iter()
+                .map(|x| match map.get(x) {
+                    Some(x) => x.clone(),
+                    None => x.clone(),
+                })
+                .collect::<Vec<Ind>>();
+            let pred = Pred {
+                name: Arc::clone(&x.name),
+                ind,
+            };
+            Arc::new(Expr::Pred(pred))
+        }
+        Expr::EquivInd(x) => {
+            let left = map.get(&x.left).unwrap_or(&x.left).clone();
+            let right = map.get(&x.right).unwrap_or(&x.right).clone();
+            let equiv_ind = EquivInd { left, right };
+            Arc::new(Expr::EquivInd(equiv_ind))
+        }
+        Expr::Var(_) => Arc::clone(src),
+        Expr::BinOp(x) => Arc::new(Expr::BinOp(BinOpExpr {
+            op: x.op.clone(),
+            left: replace_ind(&x.left, map),
+            right: replace_ind(&x.right, map),
+        })),
+        Expr::UnOp(x) => Arc::new(Expr::UnOp(UnOpExpr {
+            op: x.op.clone(),
+            expr: replace_ind(&x.expr, map),
         })),
     }
 }

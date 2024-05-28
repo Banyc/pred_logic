@@ -52,7 +52,7 @@ impl core::fmt::Display for Pred {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ind {
     Const(Var),
     Var(Var),
@@ -182,7 +182,7 @@ impl core::fmt::Display for UnOp {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quant {
     pub op: QuantOp,
-    pub ind: Ind,
+    pub ind: Var,
 }
 impl core::fmt::Display for Quant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

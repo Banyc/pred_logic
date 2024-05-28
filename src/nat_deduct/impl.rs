@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    expr::{Expr, UnnamedGen, Var},
-    extract::{extract, merge, VarExprMap},
+    expr::{BinOp, BinOpExpr, Expr, Ind, Quant, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
+    extract::{extract, merge, replace_ind, VarExprMap},
 };
 
 use super::{
@@ -115,20 +115,41 @@ impl Syllogism<'_> {
     }
 }
 
-pub fn simplification(prem: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
-    let p = Var::Unnamed(unnamed_space.gen());
-    let q = Var::Unnamed(unnamed_space.gen());
-    let p_expr = Arc::new(Expr::Var(p.clone()));
-    let q_expr = Arc::new(Expr::Var(q.clone()));
-    let pat = and(Arc::clone(&p_expr), Arc::clone(&q_expr));
-    let captured = extract(prem, &pat)?;
-    let conclusion = captured.get(&p).unwrap();
-    Some(Arc::clone(conclusion))
+pub fn simplification(prem: &Expr) -> Option<Arc<Expr>> {
+    let Expr::BinOp(BinOpExpr {
+        op: BinOp::And,
+        left,
+        right: _,
+    }) = prem
+    else {
+        return None;
+    };
+    Some(Arc::clone(left))
 }
 
 pub fn addition(prem: &Arc<Expr>, q: Arc<Expr>) -> Option<Arc<Expr>> {
     let conclusion = or(Arc::clone(prem), q);
     Some(conclusion)
+}
+
+/// ```math
+/// (x)Fx // Fy
+/// (x)Fx // Fa
+/// ```
+pub fn universal_instantiation(prem: &Arc<Expr>, ind: Ind) -> Option<Arc<Expr>> {
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Quant(Quant {
+            op: QuantOp::Every,
+            ind: x,
+        }),
+        expr,
+    }) = prem.as_ref()
+    else {
+        return None;
+    };
+    let var_ind = Ind::Var(x.clone());
+    let map = HashMap::from_iter([(var_ind, ind)]);
+    Some(replace_ind(expr, &map))
 }
 
 #[cfg(test)]
@@ -286,8 +307,7 @@ mod tests {
         let prem = and(p.clone(), q.clone());
         println!("{prem}");
         assert_eq!(prem.to_string(), "p ⋅ q");
-        let unnamed_space = UnnamedGen::new();
-        let conclusion = simplification(&prem, unnamed_space).unwrap();
+        let conclusion = simplification(&prem).unwrap();
         println!("{conclusion}");
         assert_eq!(conclusion.to_string(), "p");
         assert_eq!(conclusion, p);

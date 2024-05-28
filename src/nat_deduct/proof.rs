@@ -126,7 +126,7 @@ impl DirectProof {
 
     pub fn simplification(&mut self, prem: usize) {
         let prem = &self.premises[prem];
-        let Some(expr) = simplification(prem, self.unnamed_space.clone()) else {
+        let Some(expr) = simplification(prem) else {
             return;
         };
         self.premises.push(expr);
