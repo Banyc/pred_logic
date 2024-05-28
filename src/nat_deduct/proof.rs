@@ -83,80 +83,6 @@ impl RootProof {
 }
 
 #[derive(Debug, Clone)]
-pub struct Deduction {
-    unnamed_space: UnnamedGen,
-    premises: Vec<Arc<Expr>>,
-}
-impl Deduction {
-    pub fn new(premises: Vec<Arc<Expr>>, unnamed_space: UnnamedGen) -> Self {
-        Self {
-            unnamed_space,
-            premises,
-        }
-    }
-
-    pub fn premises(&self) -> &Vec<Arc<Expr>> {
-        &self.premises
-    }
-    pub fn unnamed_space(&self) -> &UnnamedGen {
-        &self.unnamed_space
-    }
-    pub fn push_premise(&mut self, prem: Arc<Expr>, unnamed_space: Option<UnnamedGen>) {
-        self.premises.push(prem);
-        if let Some(x) = unnamed_space {
-            self.unnamed_space = x;
-        }
-    }
-
-    pub fn syllogism(&mut self, major_prem: usize, minor_prem: usize) {
-        let major_prem = &self.premises[major_prem];
-        let minor_prem = &self.premises[minor_prem];
-        let syllogism = Syllogism {
-            major_prem,
-            minor_prem,
-        };
-        let new = syllogism.any(self.unnamed_space.clone());
-        self.premises.push(new);
-    }
-
-    pub fn addition(&mut self, prem: usize, new: Arc<Expr>) {
-        let prem = &self.premises[prem];
-        let Some(expr) = addition(prem, new) else {
-            return;
-        };
-        self.premises.push(expr);
-    }
-
-    pub fn simplification(&mut self, prem: usize) {
-        let prem = &self.premises[prem];
-        let Some(expr) = simplification(prem) else {
-            return;
-        };
-        self.premises.push(expr);
-    }
-
-    pub fn replace(&mut self, prem: usize, pat: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
-        let mut unnamed_space = self.unnamed_space.clone();
-        let var = Var::Unnamed(unnamed_space.gen());
-        let pat = pat(var.clone());
-
-        let prem = &self.premises[prem];
-        let Some(captured) = extract(prem, &pat) else {
-            return;
-        };
-        let Some(expr) = captured.expr().get(&var) else {
-            return;
-        };
-        let Some(equiv) = repl::replace(expr, op, self.unnamed_space.clone()) else {
-            return;
-        };
-        let map = SymMap::from_expr_map(HashMap::from_iter([(var, equiv)]));
-        let new = extract::replace(&pat, Cow::Borrowed(&map));
-        self.premises.push(new);
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct CondProof {
     prev_proof: Box<Proof>,
     deduction: Deduction,
@@ -236,6 +162,80 @@ pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
     let p_expr = Arc::new(Expr::Var(p.clone()));
     let contradiction = and(Arc::clone(&p_expr), not(p_expr));
     extract(expr, &contradiction).is_some()
+}
+
+#[derive(Debug, Clone)]
+pub struct Deduction {
+    unnamed_space: UnnamedGen,
+    premises: Vec<Arc<Expr>>,
+}
+impl Deduction {
+    pub fn new(premises: Vec<Arc<Expr>>, unnamed_space: UnnamedGen) -> Self {
+        Self {
+            unnamed_space,
+            premises,
+        }
+    }
+
+    pub fn premises(&self) -> &Vec<Arc<Expr>> {
+        &self.premises
+    }
+    pub fn unnamed_space(&self) -> &UnnamedGen {
+        &self.unnamed_space
+    }
+    pub fn push_premise(&mut self, prem: Arc<Expr>, unnamed_space: Option<UnnamedGen>) {
+        self.premises.push(prem);
+        if let Some(x) = unnamed_space {
+            self.unnamed_space = x;
+        }
+    }
+
+    pub fn syllogism(&mut self, major_prem: usize, minor_prem: usize) {
+        let major_prem = &self.premises[major_prem];
+        let minor_prem = &self.premises[minor_prem];
+        let syllogism = Syllogism {
+            major_prem,
+            minor_prem,
+        };
+        let new = syllogism.any(self.unnamed_space.clone());
+        self.premises.push(new);
+    }
+
+    pub fn addition(&mut self, prem: usize, new: Arc<Expr>) {
+        let prem = &self.premises[prem];
+        let Some(expr) = addition(prem, new) else {
+            return;
+        };
+        self.premises.push(expr);
+    }
+
+    pub fn simplification(&mut self, prem: usize) {
+        let prem = &self.premises[prem];
+        let Some(expr) = simplification(prem) else {
+            return;
+        };
+        self.premises.push(expr);
+    }
+
+    pub fn replace(&mut self, prem: usize, pat: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
+        let mut unnamed_space = self.unnamed_space.clone();
+        let var = Var::Unnamed(unnamed_space.gen());
+        let pat = pat(var.clone());
+
+        let prem = &self.premises[prem];
+        let Some(captured) = extract(prem, &pat) else {
+            return;
+        };
+        let Some(expr) = captured.expr().get(&var) else {
+            return;
+        };
+        let Some(equiv) = repl::replace(expr, op, self.unnamed_space.clone()) else {
+            return;
+        };
+        let map = SymMap::from_expr_map(HashMap::from_iter([(var, equiv)]));
+        let new = extract::replace(&pat, Cow::Borrowed(&map));
+        self.premises.push(new);
+    }
 }
 
 #[cfg(test)]
