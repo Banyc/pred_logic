@@ -38,6 +38,18 @@ impl Proof {
         };
         Some(x)
     }
+    pub fn cond(&self) -> Option<&CondProof> {
+        let Self::Cond(x) = self else {
+            return None;
+        };
+        Some(x)
+    }
+    pub fn indirect(&self) -> Option<&IndirectProof> {
+        let Self::Indirect(x) = self else {
+            return None;
+        };
+        Some(x)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -387,6 +399,38 @@ mod tests {
         print_premises(proof.direct().premises());
         println!();
         let proof = proof.conclude().unwrap().root().unwrap().clone();
+        print_premises(proof.direct().premises());
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_logical_truth() {
+        let p = named_var_expr("P");
+        let q = named_var_expr("Q");
+        let premises = [].into();
+        let conclusion = if_p_q(p.clone(), if_p_q(q.clone(), p.clone()));
+        let proof = RootProof::new(premises, conclusion);
+        print_premises(proof.direct().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        let proof = CondProof::new(Box::new(Proof::Root(proof)), p.clone());
+        print_premises(proof.direct().premises());
+        println!();
+        let mut proof = CondProof::new(Box::new(Proof::Cond(proof)), q.clone());
+        print_premises(proof.direct().premises());
+        println!();
+        proof.direct_mut().addition(0, p.clone());
+        print_premises(proof.direct().premises());
+        println!();
+        proof
+            .direct_mut()
+            .replace(2, var_expr, ReplacementOp::TautologyOr);
+        print_premises(proof.direct().premises());
+        println!();
+        let proof = proof.conclude().cond().unwrap().clone();
+        print_premises(proof.direct().premises());
+        println!();
+        let proof = proof.conclude().root().unwrap().clone();
         print_premises(proof.direct().premises());
         assert!(proof.conclude());
     }
