@@ -152,6 +152,23 @@ pub fn universal_instantiation(prem: &Arc<Expr>, ind: Ind) -> Option<Arc<Expr>> 
     Some(replace_ind(expr, &map))
 }
 
+/// ```math
+/// Fy // (x)Fx
+/// ```
+pub fn universal_generalization(prem: &Arc<Expr>, old: Var, new: Var) -> Option<Arc<Expr>> {
+    let old_ind = Ind::Var(old);
+    let new_ind = Ind::Var(new.clone());
+    let map = HashMap::from_iter([(old_ind, new_ind)]);
+    let stat_func = replace_ind(prem, &map);
+    Some(Arc::new(Expr::UnOp(UnOpExpr {
+        op: UnOp::Quant(Quant {
+            op: QuantOp::Every,
+            ind: new,
+        }),
+        expr: stat_func,
+    })))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::nat_deduct::{not, tests::named_var_expr};
