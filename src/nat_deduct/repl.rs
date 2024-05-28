@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use crate::{
-    expr::{Expr, UnnamedGen, Var},
+    expr::{Expr, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
     extract::extract,
 };
 
 use super::{
-    and, and_or, both_p_q_then_r, comm_and, comm_or, if_not_q_not_p, if_p_q, if_p_then_if_q_r,
-    left_assoc_and, left_assoc_or, not_not, not_p_or, one_and, one_or, one_p, or, or_and,
-    right_assoc_and, right_assoc_or, three_expanded_as_and_or, three_expanded_as_or_and,
-    two_and_not, two_not_and, two_not_or, two_or_not,
+    and, and_or, both_p_q_then_r, comm_and, comm_or, every, exists, if_not_q_not_p, if_p_q,
+    if_p_then_if_q_r, left_assoc_and, left_assoc_or, not, not_not, not_p_or, one_and, one_or,
+    one_p, or, or_and, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
+    three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
 #[derive(Debug, Clone)]
@@ -58,6 +58,16 @@ pub enum ReplacementOp {
     /// p :: (p ∨ p)
     /// ```
     TautologyOr,
+    /// ```math
+    /// (x)Fx :: ∼(∃x)∼Fx
+    /// (∃x)Fx :: ∼(x)∼Fx
+    /// ```
+    QuantifierNegationEvenNot,
+    /// ```math
+    /// ∼(x)Fx :: (∃x)∼Fx
+    /// ∼(∃x)Fx :: (x)∼Fx
+    /// ```
+    QuantifierNegationOneNot,
 }
 pub fn replace(
     expr: &Arc<Expr>,
@@ -75,6 +85,8 @@ pub fn replace(
         ReplacementOp::Exportation => exportation(expr, unnamed_space.clone()),
         ReplacementOp::TautologyAnd => Some(tautology_and(expr, unnamed_space.clone())),
         ReplacementOp::TautologyOr => Some(tautology_or(expr, unnamed_space.clone())),
+        ReplacementOp::QuantifierNegationEvenNot => quantifier_negation_even_not(expr),
+        ReplacementOp::QuantifierNegationOneNot => quantifier_negation_one_not(expr),
     }
 }
 
@@ -376,6 +388,96 @@ pub fn tautology_or(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Arc<Expr> {
         return x;
     }
     tautology_empty_or(expr, unnamed_space.clone()).unwrap()
+}
+
+pub fn quantifier_negation_empty(expr: &Expr) -> Option<Arc<Expr>> {
+    let Expr::Quant(quant) = expr else {
+        return None;
+    };
+    Some(match &quant.op {
+        QuantOp::Every => not(exists(quant.var.clone(), not(Arc::clone(&quant.expr)))),
+        QuantOp::Exists => not(every(quant.var.clone(), not(Arc::clone(&quant.expr)))),
+    })
+}
+pub fn quantifier_negation_two_not(expr: &Expr) -> Option<Arc<Expr>> {
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Not,
+        expr,
+    }) = expr
+    else {
+        return None;
+    };
+    let Expr::Quant(quant) = expr.as_ref() else {
+        return None;
+    };
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Not,
+        expr,
+    }) = quant.expr.as_ref()
+    else {
+        return None;
+    };
+    Some(match &quant.op {
+        QuantOp::Every => exists(quant.var.clone(), Arc::clone(expr)),
+        QuantOp::Exists => every(quant.var.clone(), Arc::clone(expr)),
+    })
+}
+pub fn quantifier_negation_even_not(expr: &Expr) -> Option<Arc<Expr>> {
+    match (
+        quantifier_negation_empty(expr),
+        quantifier_negation_two_not(expr),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
+}
+
+pub fn quantifier_negation_not_first(expr: &Expr) -> Option<Arc<Expr>> {
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Not,
+        expr,
+    }) = expr
+    else {
+        return None;
+    };
+    let Expr::Quant(quant) = expr.as_ref() else {
+        return None;
+    };
+    Some(match &quant.op {
+        QuantOp::Every => exists(quant.var.clone(), not(Arc::clone(&quant.expr))),
+        QuantOp::Exists => every(quant.var.clone(), not(Arc::clone(&quant.expr))),
+    })
+}
+pub fn quantifier_negation_not_second(expr: &Expr) -> Option<Arc<Expr>> {
+    let Expr::Quant(quant) = expr else {
+        return None;
+    };
+    let Expr::UnOp(UnOpExpr {
+        op: UnOp::Not,
+        expr,
+    }) = quant.expr.as_ref()
+    else {
+        return None;
+    };
+    Some(match &quant.op {
+        QuantOp::Every => not(exists(quant.var.clone(), Arc::clone(expr))),
+        QuantOp::Exists => not(every(quant.var.clone(), Arc::clone(expr))),
+    })
+}
+pub fn quantifier_negation_one_not(expr: &Expr) -> Option<Arc<Expr>> {
+    match (
+        quantifier_negation_not_first(expr),
+        quantifier_negation_not_second(expr),
+    ) {
+        (Some(x), _) | // _
+        (_, Some(x)) => {
+            Some(x)
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

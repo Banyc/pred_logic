@@ -1,13 +1,14 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
-    expr::{BinOp, BinOpExpr, Expr, Ind, Quant, QuantOp, UnnamedGen, Var},
+    expr::{BinOp, BinOpExpr, Expr, Ind, QuantOp, UnnamedGen, Var},
     extract::{extract, replace, SymMap},
 };
 
 use super::{
-    and, four_and_if, four_not_p_or_not_r, four_not_q_or_not_s, four_p_or_r, four_q_or_s, if_p_q,
-    or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q, two_p, two_q,
+    and, every, exists, four_and_if, four_not_p_or_not_r, four_not_q_or_not_s, four_p_or_r,
+    four_q_or_s, if_p_q, or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q, two_p,
+    two_q,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,11 +157,7 @@ pub fn universal_generalization(prem: &Arc<Expr>, old: Var, new: Var) -> Option<
     let new_ind = Ind::Var(new.clone());
     let map = SymMap::from_ind_map(HashMap::from_iter([(old_ind, new_ind)]));
     let stat_func = replace(prem, Cow::Borrowed(&map));
-    Some(Arc::new(Expr::Quant(Quant {
-        op: QuantOp::Every,
-        var: new,
-        expr: stat_func,
-    })))
+    Some(every(new, stat_func))
 }
 
 /// ```math
@@ -191,11 +188,7 @@ pub fn existential_generalization(prem: &Arc<Expr>, old: Ind, new: Var) -> Optio
     let new_ind = Ind::Var(new.clone());
     let map = SymMap::from_ind_map(HashMap::from_iter([(old, new_ind)]));
     let stat_func = replace(prem, Cow::Borrowed(&map));
-    Some(Arc::new(Expr::Quant(Quant {
-        op: QuantOp::Exists,
-        var: new,
-        expr: stat_func,
-    })))
+    Some(exists(new, stat_func))
 }
 
 #[cfg(test)]

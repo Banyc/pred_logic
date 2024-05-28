@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::expr::{BinOp, BinOpExpr, Expr, UnOp, UnOpExpr};
+use crate::expr::{BinOp, BinOpExpr, Expr, Quant, QuantOp, UnOp, UnOpExpr, Var};
 
 pub mod r#impl;
 pub mod proof;
@@ -285,6 +285,27 @@ fn four_not_q_or_not_s(_p: Arc<Expr>, q: Arc<Expr>, _r: Arc<Expr>, s: Arc<Expr>)
 /// ```
 fn four_not_p_or_not_r(p: Arc<Expr>, _q: Arc<Expr>, r: Arc<Expr>, _s: Arc<Expr>) -> Arc<Expr> {
     or(not(p), not(r))
+}
+
+/// ```math
+/// (x)p
+/// ```
+fn every(x: Var, p: Arc<Expr>) -> Arc<Expr> {
+    Arc::new(Expr::Quant(Quant {
+        op: QuantOp::Every,
+        var: x,
+        expr: p,
+    }))
+}
+/// ```math
+/// (∃x)p
+/// ```
+fn exists(x: Var, p: Arc<Expr>) -> Arc<Expr> {
+    Arc::new(Expr::Quant(Quant {
+        op: QuantOp::Exists,
+        var: x,
+        expr: p,
+    }))
 }
 
 #[cfg(test)]

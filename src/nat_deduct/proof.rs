@@ -1,12 +1,8 @@
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use crate::{
     expr::{Expr, Ind, UnnamedGen, Var},
-    extract::{self, extract, SymMap},
+    extract::{self, extract},
 };
 
 use super::{
@@ -253,17 +249,19 @@ impl Deduction {
         let pat = pat(var.clone());
 
         let prem = &self.premises[prem];
-        let Some(captured) = extract(prem, &pat) else {
+        let Some(mut captured) = extract(prem, &pat) else {
             return;
         };
+        // println!("{pat}");
+        // println!("{captured:#?}");
         let Some(expr) = captured.expr().get(&var) else {
             return;
         };
         let Some(equiv) = repl::replace(expr, op, self.unnamed_space.clone()) else {
             return;
         };
-        let map = SymMap::from_expr_map(HashMap::from_iter([(var, equiv)]));
-        let new = extract::replace(&pat, Cow::Borrowed(&map));
+        captured.force_insert_expr(var, equiv);
+        let new = extract::replace(&pat, Cow::Borrowed(&captured));
         self.premises.push(new);
     }
 
@@ -310,9 +308,9 @@ impl Deduction {
 #[cfg(test)]
 mod tests {
     use crate::{
-        expr::{Named, Pred, Quant, QuantOp},
+        expr::{Named, Pred},
         nat_deduct::{
-            if_p_q, or,
+            every, exists, if_p_q, or,
             tests::{named_var_expr, var_expr},
         },
     };
@@ -665,20 +663,94 @@ mod tests {
         assert!(proof.conclude());
     }
 
-    fn every(var: Var, expr: Arc<Expr>) -> Arc<Expr> {
-        Arc::new(Expr::Quant(Quant {
-            op: QuantOp::Every,
-            var,
-            expr,
-        }))
+    #[test]
+    fn test_qn() {
+        let x = named_var("x");
+        let x_ind = Ind::Var(x.clone());
+        let p_x = singular_pred("P", x_ind.clone());
+        let q_x = singular_pred("Q", x_ind.clone());
+        let r_x = singular_pred("R", x_ind.clone());
+        let premises = [
+            not(exists(x.clone(), and(p_x.clone(), not(q_x.clone())))),
+            not(every(x.clone(), or(not(r_x.clone()), q_x.clone()))),
+        ]
+        .into();
+        let conclusion = exists(x.clone(), not(p_x.clone()));
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(0, var_expr, ReplacementOp::QuantifierNegationOneNot);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().replace(
+            2,
+            |repl| every(x.clone(), var_expr(repl)),
+            ReplacementOp::DeMorgen,
+        );
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().replace(
+            3,
+            |repl| every(x.clone(), or(not(p_x.clone()), var_expr(repl))),
+            ReplacementOp::DoubleNegation,
+        );
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(1, var_expr, ReplacementOp::QuantifierNegationOneNot);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().replace(
+            5,
+            |repl| exists(x.clone(), var_expr(repl)),
+            ReplacementOp::DeMorgen,
+        );
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().replace(
+            6,
+            |repl| exists(x.clone(), and(var_expr(repl), not(q_x.clone()))),
+            ReplacementOp::DoubleNegation,
+        );
+        print_premises(proof.deduction().premises());
+        println!();
+        let a = proof.deduction_mut().existential_instantiation(7).unwrap();
+        let a_ind = Ind::Const(a);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(4, a_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(8, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(10);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(9, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(12, 11);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .existential_generalization(13, a_ind.clone(), x.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
     }
-    fn exists(var: Var, expr: Arc<Expr>) -> Arc<Expr> {
-        Arc::new(Expr::Quant(Quant {
-            op: QuantOp::Exists,
-            var,
-            expr,
-        }))
-    }
+
     fn named_var(name: &str) -> Var {
         Var::Named(Named { name: name.into() })
     }

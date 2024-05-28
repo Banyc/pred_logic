@@ -221,7 +221,13 @@ impl Quant {
 }
 impl core::fmt::Display for Quant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{}){}", self.op, self.var, self.expr)
+        write!(
+            f,
+            "({}{}){}",
+            self.op,
+            self.var,
+            self.expr.add_necessary_paren()
+        )
     }
 }
 
