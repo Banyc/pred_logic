@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     expr::{Expr, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
-    extract::extract,
+    extract::extract_expr,
 };
 
 use super::{
@@ -100,7 +100,7 @@ macro_rules! replace {
             let pat = $pat(
                 $( Arc::new(Expr::Var($var.clone())), )*
             );
-            let captured = extract(expr, &pat)?;
+            let captured = extract_expr(expr, &pat)?;
             $( let $var = captured.expr().get(& $var).unwrap(); )*
             let equiv = $equiv(
                 $( Arc::clone($var), )*
