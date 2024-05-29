@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::expr::{BinOp, BinOpExpr, Expr, Quant, QuantOp, UnOp, UnOpExpr, Var};
+use crate::expr::{BinOp, BinOpExpr, Expr, Ident, Ind, Quant, QuantOp, UnOp, UnOpExpr, Var};
 
 pub mod r#impl;
 pub mod proof;
@@ -306,6 +306,13 @@ fn exists(x: Var, p: Arc<Expr>) -> Arc<Expr> {
         var: x,
         expr: p,
     }))
+}
+
+/// ```math
+/// x = y
+/// ```
+fn ident(x: Ind, y: Ind) -> Arc<Expr> {
+    Arc::new(Expr::Ident(Ident { left: x, right: y }))
 }
 
 #[cfg(test)]

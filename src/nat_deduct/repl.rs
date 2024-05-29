@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use crate::{
-    expr::{Expr, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
+    expr::{Expr, Ident, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
     extract::extract_expr,
 };
 
 use super::{
-    and, and_or, both_p_q_then_r, comm_and, comm_or, every, exists, if_not_q_not_p, if_p_q,
+    and, and_or, both_p_q_then_r, comm_and, comm_or, every, exists, ident, if_not_q_not_p, if_p_q,
     if_p_then_if_q_r, left_assoc_and, left_assoc_or, not, not_not, not_p_or, one_and, one_or,
     one_p, or, or_and, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
     three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
@@ -163,13 +163,21 @@ replace! (
         comm_and;
     }
 );
+pub fn commutativity_ident(expr: &Expr) -> Option<Arc<Expr>> {
+    let Expr::Ident(Ident { left, right }) = expr else {
+        return None;
+    };
+    Some(ident(right.clone(), left.clone()))
+}
 pub fn commutativity(expr: &Arc<Expr>, unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
     match (
         commutativity_or(expr, unnamed_space.clone()),
         commutativity_and(expr, unnamed_space.clone()),
+        commutativity_ident(expr),
     ) {
-        (Some(x), _) | // _
-        (_, Some(x)) => {
+        (Some(x), _, _) | // _
+        (_, Some(x), _) | // _
+        (_, _, Some(x)) => {
             Some(x)
         }
         _ => None,

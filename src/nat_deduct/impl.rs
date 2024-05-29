@@ -1,14 +1,14 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
-    expr::{BinOp, BinOpExpr, Expr, Ind, QuantOp, UnnamedGen, Var},
+    expr::{BinOp, BinOpExpr, Expr, Ident, Ind, QuantOp, UnnamedGen, Var},
     extract::{extract_expr, replace_ind, ExprMap, IndMap},
 };
 
 use super::{
     and, every, exists, four_and_if, four_not_p_or_not_r, four_not_q_or_not_s, four_p_or_r,
-    four_q_or_s, if_p_q, or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q, two_p,
-    two_q,
+    four_q_or_s, ident, if_p_q, or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q,
+    two_p, two_q,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +87,14 @@ impl Syllogism<'_> {
         and(Arc::clone(self.major_prem), Arc::clone(self.minor_prem))
     }
 
+    pub fn identity_transitivity(&self) -> Option<Arc<Expr>> {
+        let Expr::Ident(Ident { left, right }) = self.minor_prem.as_ref() else {
+            return None;
+        };
+        let map = IndMap::from_ind_map(HashMap::from_iter([(left.clone(), right.clone())]));
+        Some(replace_ind(self.major_prem, Cow::Borrowed(&map)))
+    }
+
     pub fn any(&self, unnamed_space: UnnamedGen) -> Arc<Expr> {
         if let Some(x) = self.modus_ponens(unnamed_space.clone()) {
             return x;
@@ -104,6 +112,9 @@ impl Syllogism<'_> {
             return x;
         }
         if let Some(x) = self.disjunctive_dilemma(unnamed_space.clone()) {
+            return x;
+        }
+        if let Some(x) = self.identity_transitivity() {
             return x;
         }
         self.conjunction()
@@ -189,6 +200,13 @@ pub fn existential_generalization(prem: &Arc<Expr>, old: Ind, new: Var) -> Optio
     let map = IndMap::from_ind_map(HashMap::from_iter([(old, new_ind)]));
     let stat_func = replace_ind(prem, Cow::Borrowed(&map));
     Some(exists(new, stat_func))
+}
+
+/// ```math
+/// Prem // x = x
+/// ```
+pub fn identity_reflexivity(ind: Ind) -> Arc<Expr> {
+    ident(ind.clone(), ind.clone())
 }
 
 #[cfg(test)]

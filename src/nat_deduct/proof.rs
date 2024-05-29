@@ -8,8 +8,8 @@ use crate::{
 use super::{
     and, if_p_q, not,
     r#impl::{
-        addition, existential_generalization, existential_instantiation, simplification,
-        universal_generalization, universal_instantiation, Syllogism,
+        addition, existential_generalization, existential_instantiation, identity_reflexivity,
+        simplification, universal_generalization, universal_instantiation, Syllogism,
     },
     repl::{self, ReplacementOp},
 };
@@ -243,6 +243,10 @@ impl Deduction {
         self.premises.push(expr);
     }
 
+    pub fn identity_reflexivity(&mut self, ind: Ind) {
+        self.premises.push(identity_reflexivity(ind))
+    }
+
     pub fn replace(&mut self, prem: usize, pat: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
         let mut unnamed_space = self.unnamed_space.clone();
         let var = Var::Unnamed(unnamed_space.gen());
@@ -252,8 +256,8 @@ impl Deduction {
         let Some(mut captured) = extract_expr(prem, &pat) else {
             return;
         };
-        println!("{pat}");
-        println!("{captured:#?}");
+        // println!("{pat}");
+        // println!("{captured:#?}");
         let Some(expr) = captured.expr().get(&var) else {
             return;
         };
@@ -310,7 +314,7 @@ mod tests {
     use crate::{
         expr::{Named, Pred},
         nat_deduct::{
-            every, exists, if_p_q, or,
+            every, exists, ident, if_p_q, or,
             tests::{named_var_expr, var_expr},
         },
     };
@@ -746,6 +750,43 @@ mod tests {
         proof
             .deduction_mut()
             .existential_generalization(13, a_ind.clone(), x.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_ident() {
+        let x = named_var("x");
+        let i = named_var("i");
+        let x_ind = Ind::Var(x.clone());
+        let i_ind = Ind::Var(i.clone());
+        let b_x = singular_pred("B", x_ind.clone());
+        let b_i = singular_pred("B", i_ind.clone());
+        let premises = [every(
+            x.clone(),
+            if_p_q(b_x.clone(), not(ident(x_ind.clone(), i_ind.clone()))),
+        )]
+        .into();
+        let conclusion = not(b_i.clone());
+        let mut proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(0, i_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().identity_reflexivity(i_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(2, var_expr, ReplacementOp::DoubleNegation);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(1, 3);
         print_premises(proof.deduction().premises());
         println!();
         assert!(proof.conclude());

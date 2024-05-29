@@ -12,8 +12,8 @@ pub enum Expr {
 impl Expr {
     pub fn is_branching(&self) -> bool {
         match self {
-            Expr::BinOp(_) => true,
-            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
+            Expr::BinOp(_) | Expr::Ident(_) => true,
+            Expr::Pred(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
         }
     }
 
