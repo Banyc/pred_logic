@@ -756,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ident() {
+    fn test_ident_reflexivity() {
         let x = named_var("x");
         let i = named_var("i");
         let x_ind = Ind::Var(x.clone());
@@ -787,6 +787,109 @@ mod tests {
         print_premises(proof.deduction().premises());
         println!();
         proof.deduction_mut().syllogism(1, 3);
+        print_premises(proof.deduction().premises());
+        println!();
+        assert!(proof.conclude());
+    }
+
+    #[test]
+    fn test_ident_com_transitivity() {
+        let x = named_var("x");
+        let s = named_var("s");
+        let c = named_var("c");
+        let x_ind = Ind::Var(x.clone());
+        let s_ind = Ind::Const(s.clone());
+        let c_ind = Ind::Const(c.clone());
+        let p_s = singular_pred("P", s_ind.clone());
+        let i_s = singular_pred("I", s_ind.clone());
+        let p_c = singular_pred("P", c_ind.clone());
+        let l_c = singular_pred("L", c_ind.clone());
+        let p_x = singular_pred("P", x_ind.clone());
+        let i_x = singular_pred("I", x_ind.clone());
+        let l_x = singular_pred("L", x_ind.clone());
+        let premises = [
+            and(
+                and(p_s.clone(), i_s.clone()),
+                every(
+                    x.clone(),
+                    if_p_q(
+                        and(p_x.clone(), i_x.clone()),
+                        ident(x_ind.clone(), s_ind.clone()),
+                    ),
+                ),
+            ),
+            and(p_c.clone(), l_c.clone()),
+            exists(
+                x.clone(),
+                and(and(p_x.clone(), i_x.clone()), not(l_x.clone())),
+            ),
+        ]
+        .into();
+        let conclusion = not(ident(c_ind.clone(), s_ind.clone()));
+        let proof = RootProof::new(premises, conclusion);
+        print_premises(proof.deduction().premises());
+        println!("// {}", proof.conclusion());
+        println!();
+        let mut proof = IndirectProof::new(
+            Box::new(Proof::Root(proof)),
+            ident(c_ind.clone(), s_ind.clone()),
+        );
+        print_premises(proof.deduction().premises());
+        println!();
+        let a = proof.deduction_mut().existential_instantiation(2).unwrap();
+        let a_ind = Ind::Const(a.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(0, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(5);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .universal_instantiation(6, a_ind.clone());
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(4);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(7, 8);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(3, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(9, 10);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(4, 11);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(12, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(13);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof
+            .deduction_mut()
+            .replace(1, var_expr, ReplacementOp::Commutativity);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().simplification(15);
+        print_premises(proof.deduction().premises());
+        println!();
+        proof.deduction_mut().syllogism(16, 14);
+        print_premises(proof.deduction().premises());
+        println!();
+        let proof = proof.conclude().unwrap().root().unwrap().clone();
         print_premises(proof.deduction().premises());
         println!();
         assert!(proof.conclude());

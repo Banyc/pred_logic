@@ -12,8 +12,8 @@ pub enum Expr {
 impl Expr {
     pub fn is_branching(&self) -> bool {
         match self {
-            Expr::BinOp(_) | Expr::Ident(_) => true,
-            Expr::Pred(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
+            Expr::BinOp(_) => true,
+            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
         }
     }
 
@@ -190,6 +190,10 @@ pub struct UnOpExpr {
 }
 impl core::fmt::Display for UnOpExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Expr::Ident(Ident { left, right }) = self.expr.as_ref() {
+            let UnOp::Not = &self.op;
+            return write!(f, "{left} ≠ {right}");
+        }
         let expr = self.expr.add_necessary_paren();
         let op = &self.op;
         write!(f, "{op}{expr}")
