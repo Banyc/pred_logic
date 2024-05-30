@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     expr::{Expr, Ident, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
-    extract::extract_expr,
+    subst::extract_expr,
 };
 
 use super::{

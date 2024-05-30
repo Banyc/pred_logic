@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use crate::{
     expr::{Expr, Ind, UnnamedGen, Var},
-    extract::{extract_expr, replace_expr},
+    subst::{extract_expr, replace_expr},
 };
 
 use super::{

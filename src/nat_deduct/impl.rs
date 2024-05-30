@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use crate::{
     expr::{BinOp, BinOpExpr, Expr, Ident, Ind, QuantOp, UnnamedGen, Var},
-    extract::{extract_expr, replace_ind, ExprMap, IndMap},
+    subst::{extract_expr, replace_ind, ExprMap, IndMap},
 };
 
 use super::{
