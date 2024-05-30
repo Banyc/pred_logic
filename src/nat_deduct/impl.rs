@@ -18,19 +18,19 @@ pub struct Syllogism<'a> {
 }
 macro_rules! syllogism_implication {
     ( fn $f:ident ( $( $var:ident ),* ) {
-        $major_pat:ident;
-        $minor_pat:ident;
+        $major_patt:ident;
+        $minor_patt:ident;
         $conclusion:ident;
     } ) => {
         pub fn $f(&self, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
-            let major_pat = $major_pat(
+            let major_patt = $major_patt(
                 $( Arc::new(Expr::Prop($var.clone())), )*
             );
-            let minor_pat = $minor_pat(
+            let minor_patt = $minor_patt(
                 $( Arc::new(Expr::Prop($var.clone())), )*
             );
-            let captured = self.extract(&major_pat, &minor_pat)?;
+            let captured = self.extract(&major_patt, &minor_patt)?;
             $( let $var = captured.expr().get(& $var).unwrap(); )*
             let conclusion = $conclusion(
                 $( Arc::clone($var), )*

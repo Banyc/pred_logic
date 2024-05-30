@@ -247,16 +247,16 @@ impl Deduction {
         self.premises.push(identity_reflexivity(ind))
     }
 
-    pub fn replace(&mut self, prem: usize, pat: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
+    pub fn replace(&mut self, prem: usize, patt: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
         let mut unnamed_space = self.unnamed_space.clone();
         let var = Var::Unnamed(unnamed_space.gen());
-        let pat = pat(var.clone());
+        let patt = patt(var.clone());
 
         let prem = &self.premises[prem];
-        let Some(mut captured) = extract_expr(prem, &pat) else {
+        let Some(mut captured) = extract_expr(prem, &patt) else {
             return;
         };
-        // println!("{pat}");
+        // println!("{patt}");
         // println!("{captured:#?}");
         let Some(expr) = captured.expr().get(&var) else {
             return;
@@ -265,7 +265,7 @@ impl Deduction {
             return;
         };
         captured.force_insert_expr(var, equiv);
-        let new = replace_expr(&pat, Cow::Borrowed(&captured));
+        let new = replace_expr(&patt, Cow::Borrowed(&captured));
         self.premises.push(new);
     }
 

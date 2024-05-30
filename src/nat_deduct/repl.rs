@@ -92,15 +92,15 @@ pub fn replace(
 
 macro_rules! replace {
     ( fn $f:ident ( $( $var:ident ),* ) {
-        $pat:ident;
+        $patt:ident;
         $equiv:ident;
     } ) => {
         pub fn $f(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
-            let pat = $pat(
+            let patt = $patt(
                 $( Arc::new(Expr::Prop($var.clone())), )*
             );
-            let captured = extract_expr(expr, &pat)?;
+            let captured = extract_expr(expr, &patt)?;
             $( let $var = captured.expr().get(& $var).unwrap(); )*
             let equiv = $equiv(
                 $( Arc::clone($var), )*
