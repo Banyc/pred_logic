@@ -90,59 +90,25 @@ fn two_not_q(_p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
 /// ∼(p ⋅ q)
 /// ```
 fn two_not_and(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
-    Arc::new(Expr::UnOp(UnOpExpr {
-        op: UnOp::Not,
-        expr: Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::And,
-            left: p,
-            right: q,
-        })),
-    }))
+    not(and(p, q))
 }
 /// ```math
 /// ∼p ∨ ∼q
 /// ```
 fn two_or_not(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
-    Arc::new(Expr::BinOp(BinOpExpr {
-        op: BinOp::Or,
-        left: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p,
-        })),
-        right: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: q,
-        })),
-    }))
+    or(not(p), not(q))
 }
 /// ```math
 /// ∼(p ∨ q)
 /// ```
 fn two_not_or(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
-    Arc::new(Expr::UnOp(UnOpExpr {
-        op: UnOp::Not,
-        expr: Arc::new(Expr::BinOp(BinOpExpr {
-            op: BinOp::Or,
-            left: p,
-            right: q,
-        })),
-    }))
+    not(or(p, q))
 }
 /// ```math
 /// ∼p ⋅ ∼q
 /// ```
 fn two_and_not(p: Arc<Expr>, q: Arc<Expr>) -> Arc<Expr> {
-    Arc::new(Expr::BinOp(BinOpExpr {
-        op: BinOp::And,
-        left: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: p,
-        })),
-        right: Arc::new(Expr::UnOp(UnOpExpr {
-            op: UnOp::Not,
-            expr: q,
-        })),
-    }))
+    and(not(p), not(q))
 }
 /// ```math
 /// p ∨ q
