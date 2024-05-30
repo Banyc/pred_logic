@@ -49,7 +49,7 @@ impl Default for ExprMap {
 /// Return captured expressions referred by variables in the pattern
 pub fn extract_expr(src: &Arc<Expr>, pattern: &Expr) -> Option<ExprMap> {
     match (src.as_ref(), pattern) {
-        (_, Expr::Var(var)) => {
+        (_, Expr::Prop(var)) => {
             let map = HashMap::from_iter([(var.clone(), Arc::clone(src))]);
             Some(ExprMap::from_expr_map(map))
         }
@@ -86,7 +86,7 @@ pub fn extract_expr(src: &Arc<Expr>, pattern: &Expr) -> Option<ExprMap> {
                 _ => None,
             }
         }
-        (Expr::Var(_), _) => None,
+        (Expr::Prop(_), _) => None,
         _ => None,
     }
 }
@@ -94,7 +94,7 @@ pub fn extract_expr(src: &Arc<Expr>, pattern: &Expr) -> Option<ExprMap> {
 /// Replace variables to given expressions.
 pub fn replace_expr(src: &Arc<Expr>, map: Cow<'_, ExprMap>) -> Arc<Expr> {
     match src.as_ref() {
-        Expr::Var(x) => {
+        Expr::Prop(x) => {
             let Some(expr) = map.expr().get(x) else {
                 return Arc::clone(src);
             };
@@ -179,7 +179,7 @@ impl Default for IndMap {
 /// Replace individuals.
 pub fn replace_ind(src: &Arc<Expr>, map: Cow<'_, IndMap>) -> Arc<Expr> {
     match src.as_ref() {
-        Expr::Var(_) => Arc::clone(src),
+        Expr::Prop(_) => Arc::clone(src),
         Expr::Pred(x) => {
             let ind = &x.ind;
             let ind = ind

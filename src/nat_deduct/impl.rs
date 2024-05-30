@@ -25,10 +25,10 @@ macro_rules! syllogism_implication {
         pub fn $f(&self, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
             let major_pat = $major_pat(
-                $( Arc::new(Expr::Var($var.clone())), )*
+                $( Arc::new(Expr::Prop($var.clone())), )*
             );
             let minor_pat = $minor_pat(
-                $( Arc::new(Expr::Var($var.clone())), )*
+                $( Arc::new(Expr::Prop($var.clone())), )*
             );
             let captured = self.extract(&major_pat, &minor_pat)?;
             $( let $var = captured.expr().get(& $var).unwrap(); )*

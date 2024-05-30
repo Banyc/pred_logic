@@ -98,7 +98,7 @@ macro_rules! replace {
         pub fn $f(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> Option<Arc<Expr>> {
             $( let $var = Var::Unnamed(unnamed_space.gen()); )*
             let pat = $pat(
-                $( Arc::new(Expr::Var($var.clone())), )*
+                $( Arc::new(Expr::Prop($var.clone())), )*
             );
             let captured = extract_expr(expr, &pat)?;
             $( let $var = captured.expr().get(& $var).unwrap(); )*

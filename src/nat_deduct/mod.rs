@@ -326,6 +326,6 @@ mod tests {
     }
 
     pub fn var_expr(var: Var) -> Arc<Expr> {
-        Arc::new(Expr::Var(var))
+        Arc::new(Expr::Prop(var))
     }
 }

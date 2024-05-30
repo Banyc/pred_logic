@@ -164,7 +164,7 @@ impl IndirectProof {
 /// ```
 pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
     let p = Var::Unnamed(unnamed_space.gen());
-    let p_expr = Arc::new(Expr::Var(p.clone()));
+    let p_expr = Arc::new(Expr::Prop(p.clone()));
     let contradiction = and(Arc::clone(&p_expr), not(p_expr));
     extract_expr(expr, &contradiction).is_some()
 }

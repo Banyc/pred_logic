@@ -2,18 +2,26 @@ use std::{collections::HashSet, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
+    /// a quantifier, an individual, and its statement function
     Quant(Quant),
+    /// a predicate with involved individuals
     Pred(Pred),
+    /// a binary operation
     BinOp(BinOpExpr),
+    /// a unary operation
     UnOp(UnOpExpr),
+    /// a pair of identical individuals
     Ident(Ident),
-    Var(Var),
+    /// a proposition
+    Prop(Var),
 }
 impl Expr {
     pub fn is_branching(&self) -> bool {
         match self {
             Expr::BinOp(_) => true,
-            Expr::Pred(_) | Expr::Ident(_) | Expr::Var(_) | Expr::UnOp(_) | Expr::Quant(_) => false,
+            Expr::Pred(_) | Expr::Ident(_) | Expr::Prop(_) | Expr::UnOp(_) | Expr::Quant(_) => {
+                false
+            }
         }
     }
 
@@ -50,7 +58,7 @@ impl Expr {
                 left
             }
             Expr::UnOp(x) => x.expr.free_variables(),
-            Expr::Ident(_) | Expr::Var(_) => HashSet::new(),
+            Expr::Ident(_) | Expr::Prop(_) => HashSet::new(),
         }
     }
 }
@@ -62,7 +70,7 @@ impl core::fmt::Display for Expr {
             Expr::BinOp(x) => write!(f, "{x}"),
             Expr::UnOp(x) => write!(f, "{x}"),
             Expr::Ident(x) => write!(f, "{x}"),
-            Expr::Var(x) => write!(f, "{x}"),
+            Expr::Prop(x) => write!(f, "{x}"),
         }
     }
 }
