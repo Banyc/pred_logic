@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use crate::{
-    expr::{Expr, Ind, UnnamedGen, Var},
+    expr::{BinOp, BinOpExpr, Expr, Ind, UnnamedGen, Var},
     subst::{extract_expr, replace_expr},
 };
 
@@ -63,6 +63,13 @@ pub struct RootProof {
 impl RootProof {
     pub fn new(premises: Vec<Arc<Expr>>, conclusion: Arc<Expr>) -> Self {
         let unnamed_space = UnnamedGen::new();
+        let premises = premises
+            .into_iter()
+            .map(|prem| Premise {
+                expr: prem,
+                ty: PremiseType::Deducted,
+            })
+            .collect();
         let deduction = Deduction::new(premises, unnamed_space);
         Self {
             deduction,
@@ -81,7 +88,10 @@ impl RootProof {
     }
 
     pub fn conclude(&self) -> bool {
-        self.deduction().premises.contains(&self.conclusion)
+        self.deduction()
+            .premises()
+            .iter()
+            .any(|prem| prem.expr == self.conclusion)
     }
 }
 
@@ -94,7 +104,11 @@ pub struct CondProof {
 impl CondProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
         let mut deduction = prev_proof.deduction().clone();
-        deduction.push_premise(Arc::clone(&assume), None, PremiseType::Assumed);
+        let prem = Premise {
+            expr: Arc::clone(&assume),
+            ty: PremiseType::Assumed,
+        };
+        deduction.push_premise(prem, None);
         Self {
             prev_proof,
             deduction,
@@ -111,13 +125,15 @@ impl CondProof {
 
     pub fn conclude(mut self) -> Proof {
         let last = self.deduction().premises().last().unwrap();
-        let cond = if_p_q(Arc::clone(&self.assume), Arc::clone(last));
+        let cond = if_p_q(Arc::clone(&self.assume), Arc::clone(&last.expr));
         let unnamed_space = self.deduction.unnamed_space().clone();
-        self.prev_proof.deduction_mut().push_premise(
-            cond,
-            Some(unnamed_space),
-            PremiseType::Deducted,
-        );
+        let prem = Premise {
+            expr: cond,
+            ty: PremiseType::Deducted,
+        };
+        self.prev_proof
+            .deduction_mut()
+            .push_premise(prem, Some(unnamed_space));
         *self.prev_proof
     }
 }
@@ -131,7 +147,11 @@ pub struct IndirectProof {
 impl IndirectProof {
     pub fn new(prev_proof: Box<Proof>, assume: Arc<Expr>) -> Self {
         let mut deduction = prev_proof.deduction().clone();
-        deduction.push_premise(Arc::clone(&assume), None, PremiseType::Assumed);
+        let prem = Premise {
+            expr: Arc::clone(&assume),
+            ty: PremiseType::Assumed,
+        };
+        deduction.push_premise(prem, None);
         Self {
             prev_proof,
             deduction,
@@ -149,12 +169,14 @@ impl IndirectProof {
     pub fn conclude(mut self) -> Result<Proof, Self> {
         let last = self.deduction().premises().last().unwrap();
         let unnamed_space = self.deduction.unnamed_space().clone();
-        if !contradiction(last, unnamed_space) {
+        if !contradiction(&last.expr, unnamed_space) {
             return Err(self);
         }
-        self.prev_proof
-            .deduction_mut()
-            .push_premise(not(self.assume), None, PremiseType::Deducted);
+        let prem = Premise {
+            expr: not(self.assume),
+            ty: PremiseType::Deducted,
+        };
+        self.prev_proof.deduction_mut().push_premise(prem, None);
         Ok(*self.prev_proof)
     }
 }
@@ -170,6 +192,77 @@ pub fn contradiction(expr: &Arc<Expr>, mut unnamed_space: UnnamedGen) -> bool {
 }
 
 #[derive(Debug, Clone)]
+pub struct SemanticArgument {
+    conclusion: Option<Proof>,
+    open_proofs: Vec<IndirectProof>,
+}
+impl SemanticArgument {
+    pub fn new(indirect_proof: IndirectProof) -> Self {
+        Self {
+            conclusion: None,
+            open_proofs: vec![indirect_proof],
+        }
+    }
+
+    pub fn conclude(self) -> Result<Proof, Self> {
+        if !self.open_proofs.is_empty() {
+            return Err(self);
+        }
+        Ok(self.conclusion.unwrap())
+    }
+
+    pub fn close_last(&mut self) {
+        let Some(open_proof) = self.open_proofs.pop() else {
+            return;
+        };
+        let closed_proof = open_proof.conclude();
+        match closed_proof {
+            Ok(x) => self.conclusion = Some(x),
+            Err(x) => self.open_proofs.push(x),
+        }
+    }
+
+    pub fn last_open_mut(&mut self) -> Option<&mut IndirectProof> {
+        self.open_proofs.last_mut()
+    }
+
+    pub fn split_last(&mut self) {
+        let Some(mut open_proof) = self.open_proofs.last().cloned() else {
+            return;
+        };
+        let prem = open_proof.deduction_mut().pop_premise().unwrap();
+        let Expr::BinOp(BinOpExpr {
+            op: BinOp::Or,
+            left,
+            right,
+        }) = prem.expr.as_ref()
+        else {
+            return;
+        };
+        let left = Premise {
+            expr: Arc::clone(left),
+            ty: PremiseType::Assumed,
+        };
+        let right = Premise {
+            expr: Arc::clone(right),
+            ty: PremiseType::Assumed,
+        };
+        let mut left_proof = open_proof.clone();
+        left_proof.deduction_mut().push_premise(left, None);
+        let mut right_proof = open_proof.clone();
+        right_proof.deduction_mut().push_premise(right, None);
+        self.open_proofs.push(right_proof);
+        self.open_proofs.push(left_proof);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Premise {
+    pub expr: Arc<Expr>,
+    pub ty: PremiseType,
+}
+
+#[derive(Debug, Clone)]
 pub enum PremiseType {
     Assumed,
     Deducted,
@@ -178,73 +271,76 @@ pub enum PremiseType {
 #[derive(Debug, Clone)]
 pub struct Deduction {
     unnamed_space: UnnamedGen,
-    premises: Vec<Arc<Expr>>,
-    assumed_premises: Vec<usize>,
+    premises: Vec<Premise>,
     free_variables_in_existential_instantiation: HashSet<Var>,
 }
 impl Deduction {
-    pub fn new(premises: Vec<Arc<Expr>>, unnamed_space: UnnamedGen) -> Self {
+    pub fn new(premises: Vec<Premise>, unnamed_space: UnnamedGen) -> Self {
         Self {
             unnamed_space,
             premises,
-            assumed_premises: vec![],
             free_variables_in_existential_instantiation: HashSet::new(),
         }
     }
 
-    pub fn premises(&self) -> &Vec<Arc<Expr>> {
+    pub fn premises(&self) -> &Vec<Premise> {
         &self.premises
     }
     pub fn unnamed_space(&self) -> &UnnamedGen {
         &self.unnamed_space
     }
-    pub fn push_premise(
-        &mut self,
-        prem: Arc<Expr>,
-        unnamed_space: Option<UnnamedGen>,
-        ty: PremiseType,
-    ) {
-        match ty {
-            PremiseType::Assumed => {
-                self.assumed_premises.push(self.premises.len());
-            }
-            PremiseType::Deducted => (),
-        }
+    pub fn push_premise(&mut self, prem: Premise, unnamed_space: Option<UnnamedGen>) {
         self.premises.push(prem);
         if let Some(x) = unnamed_space {
             self.unnamed_space = x;
         }
     }
+    pub fn pop_premise(&mut self) -> Option<Premise> {
+        self.premises.pop()
+    }
 
     pub fn syllogism(&mut self, major_prem: usize, minor_prem: usize) {
-        let major_prem = &self.premises[major_prem];
-        let minor_prem = &self.premises[minor_prem];
+        let major_prem = &self.premises[major_prem].expr;
+        let minor_prem = &self.premises[minor_prem].expr;
         let syllogism = Syllogism {
             major_prem,
             minor_prem,
         };
         let new = syllogism.any(self.unnamed_space.clone());
-        self.premises.push(new);
+        self.premises.push(Premise {
+            expr: new,
+            ty: PremiseType::Deducted,
+        });
     }
 
     pub fn addition(&mut self, prem: usize, new: Arc<Expr>) {
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let Some(expr) = addition(prem, new) else {
             return;
         };
-        self.premises.push(expr);
+        self.premises.push(Premise {
+            expr,
+            ty: PremiseType::Deducted,
+        });
     }
 
     pub fn simplification(&mut self, prem: usize) {
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let Some(expr) = simplification(prem) else {
             return;
         };
-        self.premises.push(expr);
+        self.premises.push(Premise {
+            expr,
+            ty: PremiseType::Deducted,
+        });
     }
 
     pub fn identity_reflexivity(&mut self, ind: Ind) {
-        self.premises.push(identity_reflexivity(ind))
+        let expr = identity_reflexivity(ind);
+        self.premises.push(Premise {
+            expr,
+            ty: PremiseType::Deducted,
+        })
     }
 
     pub fn replace(&mut self, prem: usize, patt: impl Fn(Var) -> Arc<Expr>, op: ReplacementOp) {
@@ -252,7 +348,7 @@ impl Deduction {
         let var = Var::Unnamed(unnamed_space.gen());
         let patt = patt(var.clone());
 
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let Some(mut captured) = extract_expr(prem, &patt) else {
             return;
         };
@@ -266,18 +362,25 @@ impl Deduction {
         };
         captured.force_insert_expr(var, equiv);
         let new = replace_expr(&patt, Cow::Borrowed(&captured));
-        self.premises.push(new);
+        self.premises.push(Premise {
+            expr: new,
+            ty: PremiseType::Deducted,
+        });
     }
 
     pub fn universal_instantiation(&mut self, prem: usize, ind: Ind) {
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let Some(prem) = universal_instantiation(prem, ind) else {
             return;
         };
-        self.premises.push(prem);
+        self.premises.push(Premise {
+            expr: prem,
+            ty: PremiseType::Deducted,
+        });
     }
     pub fn universal_generalization(&mut self, prem: usize, old: Var, new: Var) {
-        if self.assumed_premises.contains(&prem) {
+        let prem = &self.premises[prem];
+        if let PremiseType::Assumed = prem.ty {
             return;
         }
         if self
@@ -286,26 +389,34 @@ impl Deduction {
         {
             return;
         }
-        let prem = &self.premises[prem];
-        let Some(prem) = universal_generalization(prem, old, new) else {
+        let Some(prem) = universal_generalization(&prem.expr, old, new) else {
             return;
         };
-        self.premises.push(prem);
+        self.premises.push(Premise {
+            expr: prem,
+            ty: PremiseType::Deducted,
+        });
     }
     pub fn existential_instantiation(&mut self, prem: usize) -> Option<Var> {
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let (prem, var) = existential_instantiation(prem, &mut self.unnamed_space)?;
         self.free_variables_in_existential_instantiation
             .extend(prem.free_variables());
-        self.premises.push(prem);
+        self.premises.push(Premise {
+            expr: prem,
+            ty: PremiseType::Deducted,
+        });
         Some(var)
     }
     pub fn existential_generalization(&mut self, prem: usize, old: Ind, new: Var) {
-        let prem = &self.premises[prem];
+        let prem = &self.premises[prem].expr;
         let Some(prem) = existential_generalization(prem, old, new) else {
             return;
         };
-        self.premises.push(prem);
+        self.premises.push(Premise {
+            expr: prem,
+            ty: PremiseType::Deducted,
+        });
     }
 }
 
@@ -905,8 +1016,9 @@ mod tests {
         }))
     }
 
-    fn print_premises(premises: &[Arc<Expr>]) {
+    fn print_premises(premises: &[Premise]) {
         for (i, prem) in premises.iter().enumerate() {
+            let prem = &prem.expr;
             println!("{i}. {prem}");
         }
     }
