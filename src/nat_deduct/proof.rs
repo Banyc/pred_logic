@@ -1,12 +1,12 @@
 use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use crate::{
+    constructors::{and, if_p_q, not},
     expr::{BinOp, BinOpExpr, Expr, Ind, UnnamedGen, Var},
     subst::{extract_expr, replace_expr},
 };
 
 use super::{
-    and, if_p_q, not,
     r#impl::{
         addition, existential_generalization, existential_instantiation, identity_reflexivity,
         simplification, universal_generalization, universal_instantiation, Syllogism,
@@ -423,11 +423,11 @@ impl Deduction {
 #[cfg(test)]
 mod tests {
     use crate::{
-        expr::{Named, Pred},
-        nat_deduct::{
+        constructors::{
             every, exists, ident, if_p_q, or,
             tests::{named_var_expr, var_expr},
         },
+        expr::{Named, Pred},
     };
 
     use super::*;

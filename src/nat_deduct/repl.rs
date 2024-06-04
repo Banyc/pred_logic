@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use crate::{
+    constructors::{
+        and, and_or, both_p_q_then_r, comm_and, comm_or, every, exists, ident, if_not_q_not_p,
+        if_p_q, if_p_then_if_q_r, left_assoc_and, left_assoc_or, not, not_not, not_p_or, one_and,
+        one_or, one_p, or, or_and, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
+        three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
+    },
     expr::{Expr, Ident, QuantOp, UnOp, UnOpExpr, UnnamedGen, Var},
     subst::extract_expr,
-};
-
-use super::{
-    and, and_or, both_p_q_then_r, comm_and, comm_or, every, exists, ident, if_not_q_not_p, if_p_q,
-    if_p_then_if_q_r, left_assoc_and, left_assoc_or, not, not_not, not_p_or, one_and, one_or,
-    one_p, or, or_and, right_assoc_and, right_assoc_or, three_expanded_as_and_or,
-    three_expanded_as_or_and, two_and_not, two_not_and, two_not_or, two_or_not,
 };
 
 #[derive(Debug, Clone)]
@@ -490,7 +489,7 @@ pub fn quantifier_negation_one_not(expr: &Expr) -> Option<Arc<Expr>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::nat_deduct::tests::named_var_expr;
+    use crate::constructors::tests::named_var_expr;
 
     use super::*;
 

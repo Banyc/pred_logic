@@ -5,7 +5,7 @@ use crate::{
     subst::{extract_expr, replace_ind, ExprMap, IndMap},
 };
 
-use super::{
+use crate::constructors::{
     and, every, exists, four_and_if, four_not_p_or_not_r, four_not_q_or_not_s, four_p_or_r,
     four_q_or_s, ident, if_p_q, or, three_if_p_q, three_if_p_r, three_if_q_r, two_not_p, two_not_q,
     two_p, two_q,
@@ -211,7 +211,7 @@ pub fn identity_reflexivity(ind: Ind) -> Arc<Expr> {
 
 #[cfg(test)]
 mod tests {
-    use crate::nat_deduct::{not, tests::named_var_expr};
+    use crate::constructors::{not, tests::named_var_expr};
 
     use super::*;
 
