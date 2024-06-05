@@ -133,6 +133,7 @@ fn impl_to_disj(expr: &Arc<Expr>) -> Option<Arc<Expr>> {
         Expr::Prop(_) => Arc::clone(expr),
     })
 }
+
 fn neg_atom(expr: &Arc<Expr>) -> Option<Arc<Expr>> {
     Some(match expr.as_ref() {
         Expr::Quant(_) | Expr::Pred(_) | Expr::Ident(_) => return None,
